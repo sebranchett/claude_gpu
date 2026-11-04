@@ -35,7 +35,7 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    sbatch 01_build_gpu.slurm
    sbatch 02_build_cpu.slurm
    ```
-   Each ends with `BUILD OK`. If the GPU build hits the 4 h limit of `gpu-a100-small`, resubmit it; it carries on where it stopped. Check the `config/report` printed in the job output: it lists which libraries were found or built internally, and that CUDA, MPI, OpenMP and SLEPc are enabled.
+   Each ends with `BUILD OK`. If the GPU build hits the 4 h limit of `gpu-a100-small`, resubmit it; it carries on where it stopped. To start a build tree over, submit with `--export=ALL,FRESH=1` (see [Options](#options)). Yambo's own build skips external libraries that fail, so the job builds them first and checks that each one installed. If one did not, the job prints its logs, resets it so a resubmit retries it, and stops. Check the `config/report` printed in the job output: it lists which libraries were found or built internally, and that CUDA, MPI, OpenMP and SLEPc are enabled.
 3. **QE + p2y**, after the CPU build:
    ```bash
    sbatch 03_qe_prep.slurm
@@ -57,6 +57,20 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_1gpu}
    ```
    It checks that every output file agrees between the runs (QP corrections within 5 meV, spectra within 1 %), and prints the wall time of each step with speed-ups relative to the CPU node.
+
+## Options
+
+Set these as environment variables when submitting, for example `sbatch --export=ALL,FRESH=1 01_build_gpu.slurm`. Several go in one list: `--export=ALL,NB=100,LAUNCH="mpirun -np 2"`. Always keep `ALL`, or the job loses your environment.
+
+| Variable | Jobs | Default | What it does |
+|---|---|---|---|
+| `FRESH=1` | `01`, `02` | off | Deletes the build tree (`build/gpu/` or `build/cpu/`) and builds from scratch. Use it when an earlier attempt left broken state behind, for example after a toolchain change. A fresh build takes several hours, so the GPU build will need resubmitting; leave `FRESH` out of those resubmits, or each one starts over. |
+| `CUDA_RUNTIME=X.Y` | `01` | newest nvhpc CUDA the driver supports | CUDA version passed to `--with-cuda-runtime`. Only takes effect before configure has run, so combine it with `FRESH=1` on an existing tree. |
+| `LIBATOMIC_DIR=/path` | all that load the toolchain | from the `gcc` module | Directory containing `libatomic.so.1`, if the automatic search fails (the job then stops and says so). |
+| `NBND=N` | `03` | 200 | Number of bands in the QE nscf run. |
+| `USE_TUTORIAL_SAVE=1` | `03` | off | Skips QE + `p2y` and uses the tutorial's ready-made SAVE (100 bands). Then run the tests with `NB=100`. |
+| `NB=N` | `04`, `05`, `07` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |
+| `LAUNCH="cmd"` | `04`, `05`, `07` | `srun --mpi=pmix` | MPI launcher, for example `LAUNCH="mpirun -np 2"`. See [Known limitations](#known-limitations-and-things-to-check). |
 
 ## The test
 
