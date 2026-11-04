@@ -74,14 +74,47 @@ if [ ! -f config/setup ] || [ ! -f .configure_done ]; then
 fi
 cat config/report 2>/dev/null || true
 
+# Yambo marks IOTK as compiled even when its configure failed (the first GPU
+# attempt: missing libatomic). If the library is not installed, start IOTK over.
+if grep -q '^do_iotk *= *yes' config/mk/global/defs.mk 2>/dev/null &&
+   [ ! -e lib/external/nvfortran/mpif90/lib/libiotk.a ] && ls lib/iotk/*.stamp > /dev/null 2>&1; then
+    echo "== IOTK was not installed by an earlier attempt; resetting lib/iotk"
+    rm -f lib/iotk/*.stamp
+    rm -rf lib/iotk/iotk lib/iotk/iotk-y1.2.2
+fi
+
+# Yambo writes each compiler's messages to files under log/, not to make.out.
+# On failure, print the errors from make.out and from every log written by this make.
+show_compile_errors() {
+    # \b keeps file names such as qe_errore.F out; compile command lines are
+    # skipped and long lines cut, since each one is several kB of -I flags.
+    local pat='NVFORTRAN-[SFW]-|\b[Ee]rror\b|\b[Ss]evere\b|[Uu]nable to open|undefined reference'
+    local cmd='^(mpif90|mpicc|nvfortran|nvc|cpp) '
+    echo "== Compiler errors in make.out"
+    grep -n -E "$pat" make.out | grep -v -E 'Waiting for unfinished|\*\*\* \[' | cut -c1-300 | head -40 || true
+    echo "== Logs written by this make, with errors"
+    local f n=0
+    while IFS= read -r f; do
+        grep -v -E "$cmd" "$f" | grep -q -E "$pat" || continue
+        echo "---- $tree/$f"
+        grep -n -E -v "$cmd" "$f" | grep -E -B3 -A8 "$pat" | cut -c1-300 | head -60
+        n=$((n + 1)); [ "$n" -ge 5 ] && { echo "(more logs with errors not shown)"; break; }
+    done < <(find log -type f -newer .make_start 2>/dev/null | sort)
+    [ "$n" -gt 0 ] || echo "(no log under $tree/log written by this make contains an error line)"
+}
+
 echo "== make -j $nproc core  ($(date))"
+touch .make_start
 set +e
 make -j "$nproc" core > make.out 2>&1
 status=$?
 set -e
 tail -40 make.out
 echo "make exit status $status ($(date))"
-[ "$status" = 0 ] || die "make failed, see $tree/make.out and $tree/log/"
+if [ "$status" != 0 ]; then
+    show_compile_errors || true
+    die "make failed, see $tree/make.out and $tree/log/"
+fi
 
 echo "== Binaries"
 ls -l bin/
@@ -90,5 +123,9 @@ if ldd bin/yambo | grep -i 'not found'; then die "unresolved shared libraries in
 
 mkdir -p "$MODULE_DIR/yambo-$flavour"
 cp "$SCRIPT_DIR/modulefiles/yambo-$flavour/$YAMBO_VERSION.lua" "$MODULE_DIR/yambo-$flavour/"
+# The binaries need the same libatomic at run time (see ensure_libatomic in common.sh).
+if [ -n "$LIBATOMIC_ADDED" ]; then
+    echo "prepend_path(\"LD_LIBRARY_PATH\", \"$LIBATOMIC_ADDED\")" >> "$MODULE_DIR/yambo-$flavour/$YAMBO_VERSION.lua"
+fi
 echo "Installed modulefile $MODULE_DIR/yambo-$flavour/$YAMBO_VERSION.lua"
 echo "BUILD OK"

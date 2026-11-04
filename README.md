@@ -4,7 +4,7 @@ Scripts that build Yambo 5.3.0 for the A100 GPU nodes of DelftBlue, plus a CPU-o
 
 | | GPU build | CPU build |
 |---|---|---|
-| Compiler / MPI | `nvhpc/25.7` (nvfortran + bundled Open MPI) | same |
+| Compiler / MPI | `nvhpc/25.7` (nvfortran + bundled HPC-X Open MPI), plus the 2026 `gcc` module for `libatomic.so.1` | same |
 | GPU | CUDA Fortran, `--with-cuda-cc=80`, CUDA runtime auto-detected from the driver | – |
 | Parallelism | MPI + OpenMP | MPI + OpenMP |
 | Libraries | built by Yambo: HDF5 (parallel I/O), netCDF, LibXC, FFTW, ScaLAPACK, PETSc + SLEPc | same |
