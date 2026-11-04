@@ -19,14 +19,19 @@ mpif90 --showme 2>/dev/null || true
 NVROOT=$(cd "$(dirname "$(which nvfortran)")/../.." && pwd)   # .../hpc_sdk/Linux_x86_64/25.7
 echo "NVHPC root: $NVROOT"
 
-# The bundled MPI must be CUDA-aware for the GPU build; ompi_info is not on PATH,
-# so look for it inside the SDK.
-ompi_info=$(find "$NVROOT/comm_libs" -name ompi_info -type f 2>/dev/null | head -1 || true)
+# The bundled MPI must be CUDA-aware for the GPU build; ompi_info is not on PATH.
+# The SDK ships several Open MPIs (HPC-X, openmpi4), so take the ompi_info that
+# belongs to the library mpif90 actually links: next to mpif90, or next to its lib dir.
+mpi_libdir=$(mpif90 --showme:libdirs 2>/dev/null | awk '{print $1}' || true)
+ompi_info=
+for c in "$(dirname "$(readlink -f "$(which mpif90)")")/ompi_info" "${mpi_libdir:+$mpi_libdir/../bin/ompi_info}"; do
+    if [ -n "$c" ] && [ -x "$c" ]; then ompi_info=$c; break; fi
+done
 if [ -n "$ompi_info" ]; then
     echo "ompi_info: $ompi_info"
     "$ompi_info" --parsable --all | grep mpi_built_with_cuda_support || true
 else
-    echo "WARNING: no ompi_info found under $NVROOT/comm_libs; CUDA-awareness of MPI not verified"
+    echo "WARNING: no ompi_info found for mpif90 (lib dir: ${mpi_libdir:-unknown}); CUDA-awareness of MPI not verified"
 fi
 
 if [ ! -d "$tree" ]; then
@@ -46,7 +51,8 @@ conf=(MPIFC=mpif90 MPICC=mpicc FC=nvfortran F77=nvfortran
 if [ "$flavour" = gpu ]; then
     echo "== GPU"
     nvidia-smi || die "no GPU visible; the GPU build must run on a GPU node"
-    driver_cuda=$(nvidia-smi | grep -oP 'CUDA Version: \K[0-9.]+') || die "cannot read driver CUDA version"
+    # Newer drivers print "CUDA UMD Version: X.Y" instead of "CUDA Version: X.Y".
+    driver_cuda=$(nvidia-smi | grep -oP 'CUDA (UMD )?Version: \K[0-9.]+' | head -1) || die "cannot read driver CUDA version"
     # Highest CUDA bundled with nvhpc that the driver supports, unless overridden.
     if [ -z "${CUDA_RUNTIME:-}" ]; then
         CUDA_RUNTIME=$(ls "$NVROOT/cuda" | grep -E '^[0-9]+\.[0-9]+$' |
