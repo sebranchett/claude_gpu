@@ -17,6 +17,11 @@ if [ ! -s hBN.tar.gz ]; then
     curl -fL -o hBN.tar.gz https://media.yambo-code.eu/educational/tutorials/files/hBN.tar.gz
 fi
 
+# yaml-0.2.2 is missing from Yambo's mirror (yambo-libraries/external), so take it from upstream libyaml.
+if [ ! -s extlibs/yaml-0.2.2.tar.gz ]; then
+    curl -fL -o extlibs/yaml-0.2.2.tar.gz https://pyyaml.org/download/libyaml/yaml-0.2.2.tar.gz
+fi
+
 # Yambo's own downloader (lib/archive/Makefile.loc) fetches the pinned library versions.
 # Without a configured tree it only downloads, which is what we want here.
 work=$(mktemp -d)
