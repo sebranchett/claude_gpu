@@ -34,6 +34,12 @@ else
     echo "WARNING: no ompi_info found for mpif90 (lib dir: ${mpi_libdir:-unknown}); CUDA-awareness of MPI not verified"
 fi
 
+# FRESH=1 starts the build tree over (needed once after the libatomic fix: the
+# earlier attempts left libraries and objects stamped as built that are not).
+if [ "${FRESH:-0}" = 1 ] && [ -d "$tree" ]; then
+    echo "== FRESH=1: removing $tree"
+    rm -rf "$tree"
+fi
 if [ ! -d "$tree" ]; then
     mkdir -p "$BUILD_ROOT/$flavour"
     tar -xzf "$SRC_DIR/yambo-$YAMBO_VERSION.tar.gz" -C "$BUILD_ROOT/$flavour"
@@ -74,14 +80,70 @@ if [ ! -f config/setup ] || [ ! -f .configure_done ]; then
 fi
 cat config/report 2>/dev/null || true
 
-# Yambo marks IOTK as compiled even when its configure failed (the first GPU
-# attempt: missing libatomic). If the library is not installed, start IOTK over.
-if grep -q '^do_iotk *= *yes' config/mk/global/defs.mk 2>/dev/null &&
-   [ ! -e lib/external/nvfortran/mpif90/lib/libiotk.a ] && ls lib/iotk/*.stamp > /dev/null 2>&1; then
-    echo "== IOTK was not installed by an earlier attempt; resetting lib/iotk"
-    rm -f lib/iotk/*.stamp
-    rm -rf lib/iotk/iotk lib/iotk/iotk-y1.2.2
-fi
+# External libraries. Yambo's ext-libs loop ignores failures, and each library's
+# Makefile.loc touches its configured/compiled/installed stamps even when that step
+# failed, so a broken library is never retried and the build only fails later
+# (e.g. "Unable to open MODULE file netcdf.mod"). So: build them as a separate
+# step, check that each enabled library installed its files, and reset the ones
+# that did not, so that a resubmit retries them.
+#   defs.mk switch : build dir under lib/ : log name prefix : files that must exist
+EXT_CHECKS=(
+    "do_yaml:yaml:yaml-:libyaml*.a"
+    "do_futile:futile:futile:libfutile*.a"
+    "do_iotk:iotk:iotk:libiotk.a iotk_module.mod"
+    "do_hdf5:hdf5:hdf5:libhdf5.a"
+    "do_netcdf:netcdf:netcdf-c:libnetcdf.a"
+    "do_netcdf:netcdff:netcdf-fortran:libnetcdff.a netcdf.mod"
+    "do_etsf:etsf_io:etsf_io:libetsf_io.a"
+    "do_libxc:libxc:libxc:libxc*.a"
+    "do_lapack:lapack:lapack:liblapack.a"
+    "do_slk:scalapack:scalapack:libscalapack.a"
+    "do_fftw:fftw:fftw:libfftw3*.a"
+    "do_petsc:petsc:petsc:libpetsc.*"
+    "do_slepc:slepc:slepc:libslepc.*"
+    "do_devxlib:devxlib:devicexlib:libdevxlib*.a"
+)
+
+# check_ext_libs report|quiet: prints/handles libraries whose files are missing and
+# resets them. Returns 1 if any were missing.
+check_ext_libs() {
+    local mode=$1 entry sw dir logp files f missing bad=0
+    local -a pats
+    for entry in "${EXT_CHECKS[@]}"; do
+        IFS=: read -r sw dir logp files <<< "$entry"
+        grep -q "^$sw *= *yes" config/mk/global/defs.mk 2>/dev/null || continue
+        read -ra pats <<< "$files"      # no glob expansion of the patterns
+        missing=
+        for f in "${pats[@]}"; do
+            [ -n "$(find lib/external -iname "$f" -print -quit 2>/dev/null)" ] || missing="$missing $f"
+        done
+        [ -z "$missing" ] && continue
+        bad=1
+        if [ "$mode" = report ]; then
+            echo "---- external library '$dir' did not install:$missing"
+            for f in log/*_"$logp"*.log; do
+                [ -f "$f" ] || continue
+                echo "  -- $tree/$f (last 15 lines)"
+                tail -15 "$f" | cut -c1-300 | sed 's/^/     /'
+            done
+            # The package's own configure log usually holds the real reason.
+            for f in $(find "lib/$dir" -maxdepth 3 \( -name config.log -o -name configure.log \) 2>/dev/null); do
+                echo "  -- $tree/$f (error lines)"
+                grep -n -i -E 'error|cannot|not found|fatal' "$f" | tail -15 | cut -c1-300 | sed 's/^/     /'
+            done
+        fi
+        # Only reset trees that were started; a library never attempted has no stamps.
+        if ls "lib/$dir"/*.stamp > /dev/null 2>&1; then
+            echo "== resetting lib/$dir so that it is rebuilt"
+            rm -f "lib/$dir"/*.stamp
+            find "lib/$dir" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) -exec rm -rf {} +
+        fi
+    done
+    return $bad
+}
+
+# Libraries left half-built by an earlier attempt are retried now.
+check_ext_libs quiet || true
 
 # Yambo writes each compiler's messages to files under log/, not to make.out.
 # On failure, print the errors from make.out and from every log written by this make.
@@ -103,8 +165,21 @@ show_compile_errors() {
     [ "$n" -gt 0 ] || echo "(no log under $tree/log written by this make contains an error line)"
 }
 
-echo "== make -j $nproc core  ($(date))"
+echo "== make -j $nproc ext-libs  ($(date))"
 touch .make_start
+set +e
+make -j "$nproc" ext-libs > make_ext.out 2>&1
+status=$?
+set -e
+tail -20 make_ext.out
+echo "make ext-libs exit status $status ($(date))"
+echo "== Checking external libraries"
+if ! check_ext_libs report; then
+    die "external libraries missing (see above); they were reset, so fix the cause and resubmit"
+fi
+echo "all enabled external libraries are installed"
+
+echo "== make -j $nproc core  ($(date))"
 set +e
 make -j "$nproc" core > make.out 2>&1
 status=$?
