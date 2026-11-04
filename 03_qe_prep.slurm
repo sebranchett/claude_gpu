@@ -25,7 +25,7 @@ sed -i "s/nbnd *= *100/nbnd = $NBND/" hBN_nscf.in
 grep -q "nbnd = $NBND" hBN_nscf.in || die "could not set nbnd in hBN_nscf.in"
 
 if [ "${USE_TUTORIAL_SAVE:-0}" = 1 ]; then
-    # Fallback if p2y cannot read QE 7.6 output: the tutorial's ready-made SAVE (100 bands).
+    # Fallback if p2y cannot read this QE's output: the tutorial's ready-made SAVE (100 bands).
     echo "== Using the tutorial SAVE instead of QE + p2y"
     mkdir -p "$TEST_ROOT/hBN_SAVE"
     rm -rf "$TEST_ROOT/hBN_SAVE/SAVE"
@@ -42,12 +42,14 @@ fi
 echo "== Quantum ESPRESSO"
 set +u
 module purge
-module load 2026
-module load "$QE_MODULE" || die "cannot load $QE_MODULE; check 'module spider $QE_MODULE' on a compute node"
+module use --append "$QE_MODULE_PATH"
+module load "$QE_MODULE" || die "cannot load $QE_MODULE from $QE_MODULE_PATH; check 'module avail $QE_MODULE' after 'module use --append $QE_MODULE_PATH'"
 set -u
+module list 2>&1
 which pw.x
 srun pw.x -nk 4 -in hBN_scf.in  > hBN_scf.out
 srun pw.x -nk 4 -in hBN_nscf.in > hBN_nscf.out
+grep -m1 -E "Program PWSCF v" hBN_scf.out || true    # QE version actually used
 grep -E "JOB DONE|highest occupied|Fermi" hBN_scf.out hBN_nscf.out || true
 
 echo "== p2y + setup (CPU Yambo)"
@@ -55,7 +57,7 @@ load_toolchain
 export PATH=$(yambo_tree cpu)/bin:$PATH
 which p2y yambo
 cd hBN.save
-p2y > p2y.log 2>&1 || { tail -30 p2y.log; die "p2y failed (QE 7.6 output not readable?). Resubmit with: sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm"; }
+p2y > p2y.log 2>&1 || { tail -30 p2y.log; die "p2y failed (QE output not readable by Yambo 5.3.0?). Resubmit with: sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm"; }
 [ -d SAVE ] || { tail -30 p2y.log; die "p2y produced no SAVE"; }
 
 mkdir -p "$TEST_ROOT/hBN_SAVE"

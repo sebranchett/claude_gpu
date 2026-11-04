@@ -40,7 +40,7 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    ```bash
    sbatch 03_qe_prep.slurm
    ```
-   This runs `pw.x` (`qe/7.6`, CPU) for scf + nscf with 200 bands, converts the result with `p2y`, and runs the Yambo setup. If `p2y` cannot read QE 7.6 output, fall back to the tutorial's ready-made SAVE (100 bands):
+   This runs `pw.x` (CPU) for scf + nscf with 200 bands, converts the result with `p2y`, and runs the Yambo setup. QE is the project's module, loaded with `module use --append /projects/electronic_structure/.modulefiles` and `module load qe` (the job prints the QE version it used). If `p2y` cannot read that QE's output, fall back to the tutorial's ready-made SAVE (100 bands):
    ```bash
    sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm
    ```
@@ -84,4 +84,4 @@ In a GPU job use one MPI task per GPU (`--gpus-per-task=1`), several OpenMP thre
 - **CUDA-aware MPI.** The build job prints `mpi_built_with_cuda_support` from the `ompi_info` it finds in the nvhpc SDK. If it says `false`, or no `ompi_info` is found, the GPU build still works, but MPI buffers are copied through host memory.
 - **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so the 2-task test exercises the multi-GPU code path but says nothing about multi-GPU performance. Use `gpu-a100` with `--ntasks=4` for that.
 - **Launcher.** The tests use `srun --mpi=pmix`, which DelftBlue recommends and which gives each rank its own GPU. To try another launcher, set `LAUNCH`, for example `sbatch --export=ALL,LAUNCH="mpirun -np 2" ...`. With `mpirun`, check the per-rank `CUDA_VISIBLE_DEVICES` lines at the top of the job output: with MIG, two ranks must not share a slice.
-- **QE 7.6 and p2y.** QE 7.6 is newer than Yambo 5.3.0. If `p2y` fails, see step 3.
+- **QE version and p2y.** A QE much newer than Yambo 5.3.0 (e.g. 7.6) may write output `p2y` cannot read. If `p2y` fails, see step 3.

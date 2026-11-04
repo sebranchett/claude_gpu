@@ -3,7 +3,8 @@
 YAMBO_VERSION=5.3.0
 NVHPC_MODULE=nvhpc/25.7
 GCC_MODULES="compilers gcc"             # gcc 13.4.0 in the 2026 stack; supplies libatomic.so.1
-QE_MODULE=qe/7.6
+QE_MODULE_PATH=/projects/electronic_structure/.modulefiles   # project QE modules (module use --append)
+QE_MODULE=qe
 ACCOUNT=research-as-cheme
 
 PROJ=/projects/electronic_structure/yambo_gpu_2026
