@@ -10,7 +10,7 @@ tree=$(yambo_tree "$flavour")
 nproc=${SLURM_CPUS_PER_TASK:-4}
 
 load_toolchain
-ensure_autotools     # libxc is autoreconf'ed by Yambo (common.sh)
+ensure_autotools "$flavour"     # libxc is autoreconf'ed by Yambo (common.sh)
 module list 2>&1
 
 echo "== Toolchain"

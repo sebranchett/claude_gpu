@@ -67,7 +67,7 @@ Set these as environment variables when submitting, for example `sbatch --export
 | `FRESH=1` | `01`, `02` | off | Deletes the build tree (`build/gpu/` or `build/cpu/`) and builds from scratch. Use it when an earlier attempt left broken state behind, for example after a toolchain change. A fresh build takes several hours, so the GPU build will need resubmitting; leave `FRESH` out of those resubmits, or each one starts over. |
 | `CUDA_RUNTIME=X.Y` | `01` | newest nvhpc CUDA the driver supports | CUDA version passed to `--with-cuda-runtime`. Only takes effect before configure has run, so combine it with `FRESH=1` on an existing tree. |
 | `LIBATOMIC_DIR=/path` | all that load the toolchain | from the `gcc` module | Directory containing `libatomic.so.1`, if the automatic search fails (the job then stops and says so). |
-| `AUTOTOOLS_MODULES="a b"` | `01`, `02` | `autoconf automake libtool` | Modules loaded if the node has no `libtoolize`/`libtool.m4`, which Yambo needs to `autoreconf` LibXC. Only used when the system copy is missing (the job then prints what it tried). |
+| `AUTOTOOLS_MODULES="a b"` | `01`, `02` | `gpu autoconf automake libtool` (`cpu ...` for `02`) | Modules loaded if the node has no `libtoolize`/`libtool.m4`, which Yambo needs to `autoreconf` LibXC. Only used when the system copy is missing (the job then prints what it tried). |
 | `NBND=N` | `03` | 200 | Number of bands in the QE nscf run. |
 | `USE_TUTORIAL_SAVE=1` | `03` | off | Skips QE + `p2y` and uses the tutorial's ready-made SAVE (100 bands). Then run the tests with `NB=100`. |
 | `NB=N` | `04`, `05`, `07` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |

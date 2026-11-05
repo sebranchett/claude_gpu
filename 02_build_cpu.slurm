@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=yambo-build-cpu
 #SBATCH --partition=compute-p2
-#SBATCH --time=03:00:00
+#SBATCH --time=04:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=3900M

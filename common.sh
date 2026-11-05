@@ -92,16 +92,22 @@ have_libtool() {
     fi
     return 0
 }
+# Usage: ensure_autotools gpu|cpu. In the 2026 stack the autotools modules sit
+# under the partition module ('module load 2026 gpu libtool' on the GPU nodes).
 ensure_autotools() {
-    local had_u=0 m
+    local flavour=${1:-gpu} had_u=0 m fc_before
     if ! have_libtool; then
         echo "libtoolize/libtool.m4 not available; trying the stack's autotools modules"
+        fc_before=$(command -v nvfortran mpif90 | tr '\n' ' ')
         case $- in *u*) had_u=1; set +u ;; esac
         # One at a time: Lmod refuses the whole list if one name does not exist.
-        for m in ${AUTOTOOLS_MODULES:-autoconf automake libtool}; do
+        for m in ${AUTOTOOLS_MODULES:-$flavour autoconf automake libtool}; do
             module load "$m" 2>&1 || true
         done
         if [ "$had_u" = 1 ]; then set -u; fi
+        # The partition module must not have swapped out the compilers or MPI.
+        [ "$(command -v nvfortran mpif90 | tr '\n' ' ')" = "$fc_before" ] ||
+            die "loading the autotools modules changed nvfortran/mpif90 (was: $fc_before; now: $(command -v nvfortran mpif90 | tr '\n' ' '))"
         if ! have_libtool; then
             echo "-- what the node has:"
             for m in autoconf automake aclocal libtoolize; do echo "   $m: $(command -v $m || echo MISSING) $($m --version 2>/dev/null | head -1)"; done
