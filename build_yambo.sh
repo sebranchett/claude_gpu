@@ -105,6 +105,10 @@ EXT_CHECKS=(
     "do_devxlib:devxlib:devicexlib:libdevxlib*.a"
 )
 
+# Yambo's Makefiles start sub-makes with an explicit -j, so GNU make prints a
+# harmless jobserver warning for each one; drop those from the excerpts we print.
+nonoise() { grep -v -E 'make\[[0-9]+\]: warning: (-j[0-9]* forced in submake|jobserver unavailable)' || true; }
+
 # check_ext_libs report|quiet: prints/handles libraries whose files are missing and
 # resets them. Returns 1 if any were missing.
 check_ext_libs() {
@@ -125,7 +129,7 @@ check_ext_libs() {
             for f in log/*_"$logp"*.log; do
                 [ -f "$f" ] || continue
                 echo "  -- $tree/$f (last 15 lines)"
-                tail -15 "$f" | cut -c1-300 | sed 's/^/     /'
+                nonoise < "$f" | tail -15 | cut -c1-300 | sed 's/^/     /'
             done
             # The package's own configure log usually holds the real reason.
             for f in $(find "lib/$dir" -maxdepth 3 \( -name config.log -o -name configure.log \) 2>/dev/null); do
@@ -172,7 +176,7 @@ set +e
 make -j "$nproc" ext-libs > make_ext.out 2>&1
 status=$?
 set -e
-tail -20 make_ext.out
+nonoise < make_ext.out | tail -20
 echo "make ext-libs exit status $status ($(date))"
 echo "== Checking external libraries"
 if ! check_ext_libs report; then
@@ -185,7 +189,7 @@ set +e
 make -j "$nproc" core > make.out 2>&1
 status=$?
 set -e
-tail -40 make.out
+nonoise < make.out | tail -40
 echo "make exit status $status ($(date))"
 if [ "$status" != 0 ]; then
     show_compile_errors || true
