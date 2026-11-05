@@ -105,5 +105,7 @@ run_yambo bse_s,bse_h bse_s.in
 echo "== Results"
 cat timings.tsv
 ls o-*
-head -30 o-gw.qp
+# The first ~30 lines are the logo and run parameters; show the column titles and data.
+grep -m1 -E '^# *K-point' o-gw.qp || true
+grep -v '^#' o-gw.qp | head -20
 echo "TESTS OK: $run"
