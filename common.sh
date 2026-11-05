@@ -68,4 +68,48 @@ ensure_libatomic() {
     echo "libatomic.so.1: using $d"
 }
 
+# Yambo runs 'autoreconf -i --force' on some libraries (libxc) before configuring
+# them. That needs libtoolize and libtool.m4 where aclocal looks; without them it
+# fails with "possibly undefined macro: AC_DISABLE_SHARED" and the half-regenerated
+# configure then cannot find install-sh. The nodes have /usr/bin/autoconf but not
+# (necessarily) libtool, so: check, else try the stack's autotools modules, else die.
+LIBTOOL_M4=
+have_libtool() {
+    LIBTOOL_M4=
+    command -v libtoolize > /dev/null 2>&1 || return 1
+    command -v aclocal > /dev/null 2>&1 || return 1
+    local d lt_share
+    lt_share=$(cd "$(dirname "$(command -v libtoolize)")/../share/aclocal" 2>/dev/null && pwd -P) || lt_share=
+    local IFS=:
+    for d in $(aclocal --print-ac-dir 2>/dev/null) ${ACLOCAL_PATH:-} $lt_share; do
+        if [ -n "$d" ] && [ -f "$d/libtool.m4" ]; then LIBTOOL_M4=$d; break; fi
+    done
+    unset IFS
+    [ -n "$LIBTOOL_M4" ] || return 1
+    # libtool.m4 found only next to libtoolize: make sure aclocal searches there too.
+    if [ "$LIBTOOL_M4" = "$lt_share" ] && [ "$(aclocal --print-ac-dir 2>/dev/null)" != "$lt_share" ]; then
+        case ":${ACLOCAL_PATH:-}:" in *":$lt_share:"*) ;; *) export ACLOCAL_PATH="$lt_share${ACLOCAL_PATH:+:$ACLOCAL_PATH}" ;; esac
+    fi
+    return 0
+}
+ensure_autotools() {
+    local had_u=0 m
+    if ! have_libtool; then
+        echo "libtoolize/libtool.m4 not available; trying the stack's autotools modules"
+        case $- in *u*) had_u=1; set +u ;; esac
+        # One at a time: Lmod refuses the whole list if one name does not exist.
+        for m in ${AUTOTOOLS_MODULES:-autoconf automake libtool}; do
+            module load "$m" 2>&1 || true
+        done
+        if [ "$had_u" = 1 ]; then set -u; fi
+        if ! have_libtool; then
+            echo "-- what the node has:"
+            for m in autoconf automake aclocal libtoolize; do echo "   $m: $(command -v $m || echo MISSING) $($m --version 2>/dev/null | head -1)"; done
+            ( set +u; module -t avail autoconf automake libtool 2>&1 | head -20 ) || true
+            die "libtool (libtoolize + libtool.m4) not found; Yambo needs it to autoreconf libxc. Set AUTOTOOLS_MODULES to the module(s) that provide it"
+        fi
+    fi
+    echo "autotools: $(autoconf --version | head -1); $(automake --version | head -1); $(libtoolize --version | head -1); libtool.m4 in $LIBTOOL_M4"
+}
+
 die() { echo "ERROR: $*" >&2; exit 1; }
