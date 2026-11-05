@@ -94,9 +94,11 @@ module load yambo-gpu/5.3.0
 
 In a GPU job use one MPI task per GPU (`--gpus-per-task=1`), several OpenMP threads per task, and launch with `srun --mpi=pmix yambo ...`. On `gpu-a100` that means up to 4 tasks per node with up to 16 cores each.
 
+Inside a Slurm job, always start `yambo`, `p2y` and `ypp` with `srun --mpi=pmix`, even for a single process: started directly, HPC-X's Open MPI fails in `MPI_Init`. The modulefiles set `OPAL_PREFIX` and add HPC-X's libraries to `LD_LIBRARY_PATH`, which the `nvhpc` module does not do.
+
 ## Known limitations and things to check
 
 - **CUDA-aware MPI.** The build job prints `mpi_built_with_cuda_support` from the `ompi_info` it finds in the nvhpc SDK. If it says `false`, or no `ompi_info` is found, the GPU build still works, but MPI buffers are copied through host memory.
 - **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so the 2-task test exercises the multi-GPU code path but says nothing about multi-GPU performance. Use `gpu-a100` with `--ntasks=4` for that.
 - **Launcher.** The tests use `srun --mpi=pmix`, which DelftBlue recommends and which gives each rank its own GPU. To try another launcher, set `LAUNCH`, for example `sbatch --export=ALL,LAUNCH="mpirun -np 2" ...`. With `mpirun`, check the per-rank `CUDA_VISIBLE_DEVICES` lines at the top of the job output: with MIG, two ranks must not share a slice.
-- **QE version and p2y.** A QE much newer than Yambo 5.3.0 (e.g. 7.6) may write output `p2y` cannot read. If `p2y` fails, see step 3.
+- **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6 (tested). A different QE version might write output `p2y` cannot read; in that case see step 3.
