@@ -36,6 +36,26 @@ load_toolchain() {
     module load "$NVHPC_MODULE"
     if [ "$had_u" = 1 ]; then set -u; fi
     ensure_libatomic
+    set_mpi_prefix
+}
+
+# nvhpc's mpif90 (comm_libs/mpi/bin) links HPC-X's Open MPI, which lives in
+# comm_libs/<cuda>/hpcx/hpcx-*/ompi. At run time Open MPI looked for its files under
+# comm_libs/mpi instead (help files, orted, plugins) and MPI_Init failed (p2y in
+# 03_qe_prep). OPAL_PREFIX tells Open MPI where it is really installed.
+set_mpi_prefix() {
+    local libdir prefix
+    libdir=$(mpif90 --showme:libdirs 2>/dev/null | awk '{print $1}') || libdir=
+    prefix=$(cd "$libdir/.." 2>/dev/null && pwd -P) || prefix=
+    echo "MPI: OPAL_PREFIX was '${OPAL_PREFIX:-}'; mpif90 links Open MPI in '${prefix:-?}'"
+    if [ -n "$prefix" ] && [ -f "$prefix/share/openmpi/help-mpi-runtime.txt" ]; then
+        export OPAL_PREFIX=$prefix
+        echo "MPI: OPAL_PREFIX=$OPAL_PREFIX"
+    else
+        echo "WARNING: cannot find Open MPI's share/openmpi under '${prefix:-?}'; OPAL_PREFIX left as it was"
+    fi
+    # Leftovers from other MPI modules (e.g. QE's openmpi/5) would confuse HPC-X.
+    env | grep -E '^(OMPI|PMIX|OPAL)_' | grep -v '^OPAL_PREFIX=' | sed 's/^/MPI env: /' || true
 }
 
 # The HPC-X Open MPI in nvhpc 25.7 (libmpi_usempif08.so) needs libatomic.so.1,

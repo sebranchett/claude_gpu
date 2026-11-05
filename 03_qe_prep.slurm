@@ -57,7 +57,14 @@ load_toolchain
 export PATH=$(yambo_tree cpu)/bin:$PATH
 which p2y yambo
 cd hBN.save
-p2y > p2y.log 2>&1 || { tail -30 p2y.log; die "p2y failed (QE output not readable by Yambo 5.3.0?). Resubmit with: sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm"; }
+if ! p2y > p2y.log 2>&1; then
+    tail -30 p2y.log
+    # An MPI start-up failure is not a QE-format problem, and the tutorial SAVE would not help.
+    if grep -q -E 'MPI_Init|opal_init|orte_init' p2y.log; then
+        die "p2y could not start MPI (see above); this is an MPI set-up problem, not the QE output"
+    fi
+    die "p2y failed (QE output not readable by Yambo 5.3.0?). Resubmit with: sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm"
+fi
 [ -d SAVE ] || { tail -30 p2y.log; die "p2y produced no SAVE"; }
 
 mkdir -p "$TEST_ROOT/hBN_SAVE"
