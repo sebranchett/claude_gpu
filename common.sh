@@ -62,10 +62,12 @@ set_mpi_prefix() {
     # able to be opened in the pml framework" at MPI_Init.
     local hpcx d added=
     hpcx=$(cd "$prefix/.." && pwd -P)
-    for d in ucx/lib ucx/lib/ucx ucc/lib ucc/lib/ucc hcoll/lib sharp/lib nccl_rdma_sharp_plugin/lib; do
-        [ -d "$hpcx/$d" ] || continue
-        case ":${LD_LIBRARY_PATH:-}:" in *":$hpcx/$d:"*) continue ;; esac
-        added="${added:+$added:}$hpcx/$d"
+    # Open MPI's own lib dir first: the plugins also need libmca_common_*.so from there,
+    # which the rpath in our binaries does not cover.
+    for d in "$prefix/lib" "$hpcx"/{ucx/lib,ucx/lib/ucx,ucc/lib,ucc/lib/ucc,hcoll/lib,sharp/lib,nccl_rdma_sharp_plugin/lib}; do
+        [ -d "$d" ] || continue
+        case ":${LD_LIBRARY_PATH:-}:" in *":$d:"*) continue ;; esac
+        added="${added:+$added:}$d"
     done
     if [ -n "$added" ]; then
         export LD_LIBRARY_PATH="$added${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
