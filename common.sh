@@ -43,6 +43,7 @@ load_toolchain() {
 # comm_libs/<cuda>/hpcx/hpcx-*/ompi. At run time Open MPI looked for its files under
 # comm_libs/mpi instead (help files, orted, plugins) and MPI_Init failed (p2y in
 # 03_qe_prep). OPAL_PREFIX tells Open MPI where it is really installed.
+MPI_LD_ADDED=
 set_mpi_prefix() {
     local libdir prefix
     libdir=$(mpif90 --showme:libdirs 2>/dev/null | awk '{print $1}') || libdir=
@@ -53,7 +54,33 @@ set_mpi_prefix() {
         echo "MPI: OPAL_PREFIX=$OPAL_PREFIX"
     else
         echo "WARNING: cannot find Open MPI's share/openmpi under '${prefix:-?}'; OPAL_PREFIX left as it was"
+        return 0
     fi
+    # HPC-X's Open MPI plugins (pml/ucx, coll/hcoll, coll/ucc, ...) need the UCX, UCC,
+    # HCOLL and SHARP libraries that ship next to it; HPC-X's hpcx-init.sh puts them on
+    # LD_LIBRARY_PATH, the nvhpc module does not. Without them: "No components were
+    # able to be opened in the pml framework" at MPI_Init.
+    local hpcx d added=
+    hpcx=$(cd "$prefix/.." && pwd -P)
+    for d in ucx/lib ucx/lib/ucx ucc/lib ucc/lib/ucc hcoll/lib sharp/lib nccl_rdma_sharp_plugin/lib; do
+        [ -d "$hpcx/$d" ] || continue
+        case ":${LD_LIBRARY_PATH:-}:" in *":$hpcx/$d:"*) continue ;; esac
+        added="${added:+$added:}$hpcx/$d"
+    done
+    if [ -n "$added" ]; then
+        export LD_LIBRARY_PATH="$added${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        MPI_LD_ADDED=$added
+        echo "MPI: added HPC-X libraries to LD_LIBRARY_PATH: $added"
+    fi
+    # Check that the communication plugins can now load all their libraries.
+    for d in "$prefix"/lib/openmpi/mca_pml_*.so; do
+        [ -f "$d" ] || continue
+        if ldd "$d" 2>/dev/null | grep -q 'not found'; then
+            echo "WARNING: $(basename "$d") still has missing libraries:"; ldd "$d" | grep 'not found' | sed 's/^/   /'
+        else
+            echo "MPI: $(basename "$d") libraries OK"
+        fi
+    done
     # Leftovers from other MPI modules (e.g. QE's openmpi/5) would confuse HPC-X.
     env | grep -E '^(OMPI|PMIX|OPAL)_' | grep -v '^OPAL_PREFIX=' | sed 's/^/MPI env: /' || true
 }

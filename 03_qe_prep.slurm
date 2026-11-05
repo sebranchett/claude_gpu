@@ -18,7 +18,7 @@ NBND=${NBND:-200}          # tutorial uses 100; more bands make the timings mean
 # HPC-X's Open MPI cannot start as a plain process inside a Slurm job (it assumes an
 # srun launch and finds no PMIx), so p2y and yambo go through srun, like the tests.
 # One task is plenty for this system.
-YRUN="srun --ntasks=1 --mpi=pmix"
+YRUN="srun --nodes=1 --ntasks=1 --mpi=pmix"
 prep=$TEST_ROOT/prep
 
 rm -rf "$prep"
@@ -64,7 +64,7 @@ cd hBN.save
 if ! $YRUN p2y > p2y.log 2>&1; then
     tail -30 p2y.log
     # An MPI start-up failure is not a QE-format problem, and the tutorial SAVE would not help.
-    if grep -q -E 'MPI_Init|opal_init|orte_init|PMI support' p2y.log; then
+    if grep -q -E 'MPI_Init|opal_init|orte_init|PMI support|framework|PML|srun: error' p2y.log; then
         die "p2y could not start MPI (see above); this is an MPI set-up problem, not the QE output"
     fi
     die "p2y failed (QE output not readable by Yambo 5.3.0?). Resubmit with: sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm"
