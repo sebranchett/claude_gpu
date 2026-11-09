@@ -57,24 +57,10 @@ set_block() {
     sed -i -E "/^ *% *$2([ #].*)?$/{n;s/.*/ $3/}" "$1"
 }
 
-# set_or_add FILE VAR VALUE : like set_scalar, but appends 'VAR= VALUE' if the input lacks it
-set_or_add() {
-    if grep -qE "^ *#? *$2 *=" "$1"; then
-        sed -i -E "s|^ *#? *$2 *=.*|$2= $3|" "$1"
-    else
-        echo "$2= $3" >> "$1"
-    fi
-}
-
 gen_input() {   # gen_input FILE yambo-options... : write a default input with one process
     local f=$1; shift
     $LAUNCH1 yambo -F "$f" "$@" -Q > "gen_$f.log" 2>&1 || { tail -30 "gen_$f.log"; die "generating $f failed"; }
     [ -s "$f" ] || { tail -30 "gen_$f.log"; die "yambo did not write $f"; }
-    # Yambo picks X_Threads=1 by itself in the GPU build; X_THREADS=N overrides it.
-    if [ -n "${X_THREADS:-}" ]; then
-        set_or_add "$f" X_Threads "$X_THREADS"
-        grep -E "^ *X_Threads" "$f"
-    fi
 }
 
 run_yambo() {   # run_yambo JOBSTRING INPUT

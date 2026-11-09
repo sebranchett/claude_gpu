@@ -71,7 +71,6 @@ Set these as environment variables when submitting, for example `sbatch --export
 | `NBND=N` | `03` | 200 | Number of bands in the QE nscf run. |
 | `USE_TUTORIAL_SAVE=1` | `03` | off | Skips QE + `p2y` and uses the tutorial's ready-made SAVE (100 bands). Then run the tests with `NB=100`. |
 | `NB=N` | `04`, `05`, `07` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |
-| `X_THREADS=N` | `04`, `05`, `07` | Yambo's choice (1 in the GPU build) | OpenMP threads for the response function (`X_Threads`), set in every generated input. |
 | `LABEL=name` | `04`, `05`, `07` | `gpu_small`, `cpu_p2`, `gpu_a100_1gpu` | Name of the run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
 | `LAUNCH="cmd"` | `04`, `05`, `07` | `srun --mpi=pmix` | MPI launcher, for example `LAUNCH="mpirun -np 2"`. See [Known limitations](#known-limitations-and-things-to-check). |
 
@@ -114,4 +113,5 @@ The full scan result goes to `dependencies.json`. The script then prints every e
 - **CUDA-aware MPI.** The build job prints `mpi_built_with_cuda_support` from the `ompi_info` it finds in the nvhpc SDK. If it says `false`, or no `ompi_info` is found, the GPU build still works, but MPI buffers are copied through host memory.
 - **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so the 2-task test exercises the multi-GPU code path but says nothing about multi-GPU performance. Use `gpu-a100` with `--ntasks=4` for that.
 - **Launcher.** The tests use `srun --mpi=pmix`, which DelftBlue recommends and which gives each rank its own GPU. To try another launcher, set `LAUNCH`, for example `sbatch --export=ALL,LAUNCH="mpirun -np 2" ...`. With `mpirun`, check the per-rank `CUDA_VISIBLE_DEVICES` lines at the top of the job output: with MIG, two ranks must not share a slice.
+- **Screening is slow on the GPU.** Computing the screening (`Xo (procedure)` in the `r-*` reports) takes about 25 s on 2 MIG slices against about 5 s on a full compute-p2 node, in both GW and BSE. Yambo's GPU build runs that step with one OpenMP thread whatever `X_Threads` says. GW is still about 1.7× faster on the GPU because its self-energy part is much faster there, but the BSE Haydock step, where the screening is most of the work, is about 2.4× slower. We use Yambo as released and have not looked into this further.
 - **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6 (tested). A different QE version might write output `p2y` cannot read; in that case see step 3.
