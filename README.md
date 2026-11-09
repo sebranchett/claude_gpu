@@ -56,7 +56,7 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    ```bash
    python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_1gpu}
    ```
-   It checks that every output file agrees between the runs (QP corrections within 5 meV, spectra within 1 %), and prints the wall time of each step with speed-ups relative to the CPU node.
+   It checks that every output file agrees between the runs (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %: Haydock stops at 2 % accuracy, `BSHayTrs`), and prints the wall time of each step with speed-ups relative to the CPU node.
 
 ## Options
 
@@ -71,6 +71,8 @@ Set these as environment variables when submitting, for example `sbatch --export
 | `NBND=N` | `03` | 200 | Number of bands in the QE nscf run. |
 | `USE_TUTORIAL_SAVE=1` | `03` | off | Skips QE + `p2y` and uses the tutorial's ready-made SAVE (100 bands). Then run the tests with `NB=100`. |
 | `NB=N` | `04`, `05`, `07` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |
+| `X_THREADS=N` | `04`, `05`, `07` | Yambo's choice (1 in the GPU build) | OpenMP threads for the response function (`X_Threads`), set in every generated input. |
+| `LABEL=name` | `04`, `05`, `07` | `gpu_small`, `cpu_p2`, `gpu_a100_1gpu` | Name of the run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
 | `LAUNCH="cmd"` | `04`, `05`, `07` | `srun --mpi=pmix` | MPI launcher, for example `LAUNCH="mpirun -np 2"`. See [Known limitations](#known-limitations-and-things-to-check). |
 
 ## The test

@@ -13,6 +13,10 @@ from pathlib import Path
 
 QP_TOL_EV = 0.005   # max |difference| in QP corrections (E-Eo), eV
 REL_TOL = 0.01      # max difference in other outputs, relative to the column's largest value
+# Haydock stops once its own estimate of the error is below BSHayTrs (2 % in run_tests.sh, Yambo's
+# default), and its Lanczos recursion in single precision amplifies rounding differences between
+# parallel layouts, so its spectra can only be expected to agree to that accuracy.
+HAYDOCK_TOL = 0.02
 
 
 def read_table(path):
@@ -40,23 +44,26 @@ def compare_file(ref, other):
     a, b = read_table(ref), read_table(other)
     if len(a) != len(b) or not a:
         return False, f"row count differs ({len(a)} vs {len(b)})"
+    tol = HAYDOCK_TOL if "haydock" in ref.name else REL_TOL
     worst, worst_col = 0.0, None
     for col in range(min(len(a[0]), len(b[0]))):
         scale = max(abs(r[col]) for r in a) or 1.0
         diff = max(abs(ra[col] - rb[col]) for ra, rb in zip(a, b))
         if ref.name.endswith(".qp"):
-            rel = diff / QP_TOL_EV * REL_TOL   # judge QP columns on the absolute eV tolerance
+            rel = diff / QP_TOL_EV * tol   # judge QP columns on the absolute eV tolerance
         else:
             rel = diff / scale
         if rel > worst:
             worst, worst_col = rel, col
-    ok = worst <= REL_TOL
+    ok = worst <= tol
     if worst_col is None:
         detail = "identical"
     else:
         label = column_labels(ref).get(worst_col + 1)
         name = f"{worst_col + 1} ({label})" if label else f"{worst_col + 1}"
-        detail = f"worst column {name} at {worst / REL_TOL:.0%} of tolerance"
+        detail = f"worst column {name} at {worst / tol:.0%} of tolerance"
+        if not ref.name.endswith(".qp"):
+            detail += f" ({tol:.0%})"
     if ref.name.endswith(".qp"):
         dmax = max(abs(ra[3] - rb[3]) for ra, rb in zip(a, b))
         detail = f"max |d(E-Eo)| = {dmax * 1000:.2f} meV (tol {QP_TOL_EV * 1000:.0f} meV); " + detail
