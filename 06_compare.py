@@ -7,6 +7,7 @@ Usage (on a login node):
 The first run is the reference; every o-* file it has is compared with the same file
 in the other runs, and wall times are shown as speed-ups relative to the reference.
 """
+import re
 import sys
 from pathlib import Path
 
@@ -26,6 +27,15 @@ def read_table(path):
     return rows
 
 
+def column_labels(path):
+    """Column titles from Yambo's header line, e.g. '# E/ev[1] EEL/Im[2] ...' -> {1: 'E/ev', 2: 'EEL/Im'}."""
+    labels = {}
+    for line in path.read_text().splitlines():
+        if line.lstrip().startswith("#") and "[1]" in line:
+            labels = {int(n): name for name, n in re.findall(r"(\S+?)\s*\[(\d+)\]", line)}
+    return labels
+
+
 def compare_file(ref, other):
     a, b = read_table(ref), read_table(other)
     if len(a) != len(b) or not a:
@@ -41,7 +51,12 @@ def compare_file(ref, other):
         if rel > worst:
             worst, worst_col = rel, col
     ok = worst <= REL_TOL
-    detail = "identical" if worst_col is None else f"worst column {worst_col + 1} at {worst / REL_TOL:.0%} of tolerance"
+    if worst_col is None:
+        detail = "identical"
+    else:
+        label = column_labels(ref).get(worst_col + 1)
+        name = f"{worst_col + 1} ({label})" if label else f"{worst_col + 1}"
+        detail = f"worst column {name} at {worst / REL_TOL:.0%} of tolerance"
     if ref.name.endswith(".qp"):
         dmax = max(abs(ra[3] - rb[3]) for ra, rb in zip(a, b))
         detail = f"max |d(E-Eo)| = {dmax * 1000:.2f} meV (tol {QP_TOL_EV * 1000:.0f} meV); " + detail
