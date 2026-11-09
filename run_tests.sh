@@ -24,8 +24,15 @@ esac
 load_toolchain
 export PATH=$(yambo_tree "$flavour")/bin:$PATH
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-1}
+# Since Slurm 22.05, srun no longer inherits --cpus-per-task from sbatch: without this,
+# each rank may be bound to one CPU while running OMP_NUM_THREADS threads on it.
+export SRUN_CPUS_PER_TASK=$OMP_NUM_THREADS
+export OMP_PLACES=${OMP_PLACES:-cores} OMP_PROC_BIND=${OMP_PROC_BIND:-close}
 which yambo
 echo "Layout: $SLURM_NTASKS MPI tasks x $OMP_NUM_THREADS OpenMP threads on $(hostname), launcher: $LAUNCH"
+echo "Slurm $(sinfo -V 2>/dev/null | awk '{print $2}'), OMP_PLACES=$OMP_PLACES OMP_PROC_BIND=$OMP_PROC_BIND"
+# The CPUs each rank may run on (should be OMP_NUM_THREADS cores, or twice that with hyperthreads).
+$LAUNCH bash -c 'echo "rank $SLURM_PROCID: $(nproc) CPUs, affinity $(taskset -cp $$ | sed "s/.*: //")"' | sort -V | awk 'NR <= 4'
 
 if [ "$flavour" = gpu ]; then
     nvidia-smi -L
@@ -107,5 +114,6 @@ cat timings.tsv
 ls o-*
 # The first ~30 lines are the logo and run parameters; show the column titles and data.
 grep -m1 -E '^# *K-point' o-gw.qp || true
-grep -v '^#' o-gw.qp | head -20
+# awk reads the whole file: "grep | head" gets SIGPIPE, which pipefail turns into a job failure.
+awk '!/^#/ && n++ < 20' o-gw.qp
 echo "TESTS OK: $run"
