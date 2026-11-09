@@ -96,6 +96,17 @@ In a GPU job use one MPI task per GPU (`--gpus-per-task=1`), several OpenMP thre
 
 Inside a Slurm job, always start `yambo`, `p2y` and `ypp` with `srun --mpi=pmix`, even for a single process: started directly, HPC-X's Open MPI fails in `MPI_Init`. The modulefiles set `OPAL_PREFIX` and add HPC-X's libraries to `LD_LIBRARY_PATH`, which the `nvhpc` module does not do.
 
+## Checking for open-source code in these scripts
+
+`check_license_infringements.sh` scans this directory with [SCANOSS](https://github.com/scanoss/scanoss.py) to find code that matches known open-source projects, whether or not we declared it. It runs on your own machine, not on DelftBlue, and needs the `scanoss` Python package ([installation](https://docs.scanoss.com/en/latest/cli/scanoss-py/installation)):
+
+```bash
+conda activate scanoss        # or any environment with: python -m pip install scanoss
+bash check_license_infringements.sh
+```
+
+The full scan result goes to `dependencies.json`. The script then prints every entry whose `"id"` is not `"none"`, with a few lines of context: each one is a file or snippet that SCANOSS matched to an open-source component, and its licence should be checked. If nothing is printed before `Search Complete`, no matches were found.
+
 ## Known limitations and things to check
 
 - **CUDA-aware MPI.** The build job prints `mpi_built_with_cuda_support` from the `ompi_info` it finds in the nvhpc SDK. If it says `false`, or no `ompi_info` is found, the GPU build still works, but MPI buffers are copied through host memory.

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Use scanoss to check for license infringements
 # see https://github.com/scanoss/scanoss.py
+# and https://docs.scanoss.com/en/latest/cli/scanoss-py/installation
 
 # set-up
 # conda activate scanoss
