@@ -2,6 +2,8 @@
 
 Scripts that build Yambo 5.3.0 for the A100 GPU nodes of DelftBlue, plus a CPU-only reference build, and validate both with a GW + BSE run on bulk hBN.
 
+Building a newer Yambo version? Start with [UPGRADING.md](UPGRADING.md): a checklist, the DelftBlue problems we hit and their fixes, and the 5.3.0 reference results.
+
 | | GPU build | CPU build |
 |---|---|---|
 | Compiler / MPI | `nvhpc/25.7` (nvfortran + bundled HPC-X Open MPI), plus the 2026 `gcc` module for `libatomic.so.1` | same |
