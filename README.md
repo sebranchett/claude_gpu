@@ -54,7 +54,7 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    sbatch 01_build_gpu.slurm
    sbatch 02_build_cpu.slurm
    ```
-   Each ends with `BUILD OK`. If the GPU build hits the 4 h limit of `gpu-a100-small`, resubmit it; it carries on where it stopped. To start a build tree over, submit with `--export=ALL,FRESH=1` (see [Options](#options)). Yambo's own build skips external libraries that fail, so the job builds them first and checks that each one installed. If one did not, the job prints its logs, resets it so a resubmit retries it, and stops. Check the `config/report` printed in the job output: it lists which libraries were found or built internally, and that CUDA, MPI, OpenMP and SLEPc are enabled.
+   Each ends with `BUILD OK`. If the GPU build hits the 4 h limit of `gpu-a100-small`, resubmit it; it carries on where it stopped. To start a build tree over, submit with `--export=ALL,FRESH=1` (see [Options](#options)). Yambo's own build skips external libraries that fail, so the job builds them first and checks that each one installed. If one did not, the job says which, resets it so a resubmit retries it, and stops; the reason is usually in that library's own `config.log` under `lib/<library>/`. If compiling Yambo itself fails, the compiler messages are in the build tree's `log/` directory, not in `make.out`; the job prints a `grep` command that finds them. Check the `config/report` printed in the job output: it lists which libraries were found or built internally, and that CUDA, MPI, OpenMP and SLEPc are enabled.
 3. **QE + p2y**, after the CPU build:
    ```bash
    sbatch 03_qe_prep.slurm
