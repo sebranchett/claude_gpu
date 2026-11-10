@@ -10,8 +10,8 @@ Scripts that build Yambo 5.3.0 for the A100 GPU nodes of DelftBlue, plus a CPU-o
 | GPU | CUDA Fortran, `--with-cuda-cc=80`, CUDA runtime auto-detected from the driver | – |
 | Parallelism | MPI + OpenMP | MPI + OpenMP |
 | Libraries | built by Yambo: HDF5 (parallel I/O), netCDF, LibXC, FFTW, ScaLAPACK, PETSc + SLEPc | same |
-| Built on | `gpu-a100-small` | `compute-p2` |
-| Runs on | `gpu-a100`, `gpu-a100-small` | `compute-p2`, GPU nodes (not `compute-p1`: built for Sapphire Rapids) |
+| Built on | `gpu-a100-small` | `compute-p1` (Cascade Lake, so the code also runs on the newer CPUs) |
+| Runs on | `gpu-a100`, `gpu-a100-small` | `compute-p1`, `compute-p2`, GPU nodes: use `--partition=compute-p1,compute-p2` |
 
 ## Layout
 
@@ -24,7 +24,7 @@ Each Yambo version gets its own directory, `/projects/electronic_structure/yambo
   build/gpu/yambo-5.3.0/   GPU build tree = installation (bin/), do not delete
   build/cpu/yambo-5.3.0/   CPU build tree = installation
   modulefiles/             yambo-gpu/5.3.0.lua, yambo-cpu/5.3.0.lua
-  reference/cpu_p2_5.3.0/  validated test results, to compare the next version with (step 6)
+  reference/cpu_p1_5.3.0/  validated test results, to compare the next version with (step 6)
 ```
 
 Test runs go to `/scratch/$USER/yambo_5.3.0_tests`.
@@ -53,19 +53,20 @@ Copy this directory to DelftBlue as `scripts/` in the project directory and subm
 4. **Tests.** Only one job at a time is allowed on `gpu-a100-small`, so start `04` after the GPU build has finished:
    ```bash
    sbatch 04_test_gpu_small.slurm
-   sbatch 05_test_cpu_p2.slurm
-   sbatch 06_bench_gpu_a100.slurm
+   sbatch 05_test_cpu_p1.slurm
+   sbatch 06_test_cpu_p2.slurm
+   sbatch 07_bench_gpu_a100.slurm
    ```
-   The last one is an optional benchmark: 4 tasks on a whole `gpu-a100` node (4 A100s, 16 threads each), as in production.
+   `05` and `06` run the CPU build on each CPU partition, with the same layout (24 tasks × 2 threads, which fits both node types). The last one is an optional benchmark: 4 tasks on a whole `gpu-a100` node (4 A100s, 16 threads each), as in production.
 5. **Compare**, on a login node. The first run is the reference; leave out runs you did not do:
    ```bash
-   python3 -I 07_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_4gpu}
+   python3 -I 08_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p1,cpu_p2,gpu_small,gpu_a100_4gpu}
    ```
-   It checks that every output file agrees (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %, the solver's own accuracy) and prints each step's wall time with speed-ups relative to the CPU node.
-6. **Keep the reference**, once validation has passed. The CPU run's outputs, reports and timings are all `07_compare.py` needs:
+   It checks that every output file agrees (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %, the solver's own accuracy) and prints each step's wall time with speed-ups relative to the compute-p1 run.
+6. **Keep the reference**, once validation has passed. The CPU run's outputs, reports and timings are all `08_compare.py` needs:
    ```bash
-   ref=/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0
-   mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p2/{o-*,r-*,timings.tsv} $ref/
+   ref=/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p1_5.3.0
+   mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p1/{o-*,r-*,timings.tsv} $ref/
    ```
    The next version is then also compared with this one (see [UPGRADING.md](UPGRADING.md)).
 
@@ -78,8 +79,8 @@ Set these when submitting, for example `sbatch --export=ALL,FRESH=1 01_build_gpu
 | `FRESH=1` | `01`, `02` | off | Deletes the build tree and builds from scratch. Leave it out when resubmitting a build that timed out, or it starts over again. |
 | `CUDA_RUNTIME=X.Y` | `01` | newest nvhpc CUDA the driver supports | CUDA version for `--with-cuda-runtime`. Only used by configure, so combine it with `FRESH=1` on an existing tree. |
 | `NBND=N` | `03` | 200 | Bands in the QE nscf run. |
-| `NB=N` | `04`, `05`, `06` | 200 | Bands used in GW and BSE; at most the bands in the SAVE. |
-| `LABEL=name` | `04`, `05`, `06` | `gpu_small`, `cpu_p2`, `gpu_a100_4gpu` | Run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
+| `NB=N` | `04`–`07` | 200 | Bands used in GW and BSE; at most the bands in the SAVE. |
+| `LABEL=name` | `04`–`07` | `gpu_small`, `cpu_p1`, `cpu_p2`, `gpu_a100_4gpu` | Run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
 
 ## The test
 
@@ -100,14 +101,14 @@ module use /projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles
 module load yambo-gpu/5.3.0
 ```
 
-In a GPU job use one MPI task per GPU (`--gpus-per-task=1`) and several OpenMP threads per task; on `gpu-a100` that is up to 4 tasks per node with up to 16 cores each. Inside a Slurm job, always start `yambo`, `p2y` and `ypp` with `srun --mpi=pmix`, even for a single process: started directly, HPC-X's Open MPI fails in `MPI_Init`.
+For the CPU build, load `yambo-cpu/5.3.0` instead; it runs on both CPU partitions, so let Slurm choose with `--partition=compute-p1,compute-p2` and a layout that fits a 48-core compute-p1 node (for example 24 tasks × 2 threads, `--mem-per-cpu=3900M`). In a GPU job use one MPI task per GPU (`--gpus-per-task=1`) and several OpenMP threads per task; on `gpu-a100` that is up to 4 tasks per node with up to 16 cores each. Inside a Slurm job, always start `yambo`, `p2y` and `ypp` with `srun --mpi=pmix`, even for a single process: started directly, HPC-X's Open MPI fails in `MPI_Init`.
 
 **Example job.** `example/yambo_hBN_gpu.slurm` runs the hBN test as a standalone job, without these scripts: it loads the module, copies the user's SAVE to `/scratch/$USER/yambo_hBN_example/<job id>`, runs Yambo's setup if needed, and runs GW, BSE Haydock and BSE SLEPc on one full `gpu-a100` node (a comment shows how to use `gpu-a100-small` instead). Users make their own hBN SAVE (QE scf + nscf with the tutorial's inputs, converted with `p2y`; see [01_scf.sh in MoS2-QE-Yambo-pnas](https://github.com/sebranchett/MoS2-QE-Yambo-pnas/blob/main/01_scf.sh) or the [Simulation Suite](https://simulationsuite.streamlit.app/)), copy the script, set `SAVE_SRC` and `--account` in it, and submit it with `sbatch`. By default `SAVE_SRC` is the SAVE from step 3.
 
 ## Known limitations
 
-- **Screening is slow on the GPU.** Yambo's GPU build computes the screening (`Xo (procedure)` in the `r-*` reports) with a single host thread, whatever `X_Threads` says, and a bigger GPU does not help. With 2 tasks on 2 MIG slices GW is still about 1.7× faster than a compute-p2 node, but BSE Haydock is about 2.4× slower; with one task on a full A100, GW is no faster and BSE Haydock about 4.5× slower. More MPI tasks split the screening. Details in [UPGRADING.md](UPGRADING.md). We use Yambo as released.
-- **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so `04` exercises the multi-GPU code path but says nothing about multi-GPU performance; `06` measures that.
+- **Screening is slow on the GPU.** Yambo's GPU build computes the screening (`Xo (procedure)` in the `r-*` reports) with a single host thread, whatever `X_Threads` says, and a bigger GPU does not help. With 2 tasks on 2 MIG slices GW is still about 1.7× faster than a full compute-p2 node (earlier CPU build, 32 tasks × 2 threads), but BSE Haydock is about 2.4× slower; with one task on a full A100, GW is no faster and BSE Haydock about 4.5× slower. More MPI tasks split the screening. Details in [UPGRADING.md](UPGRADING.md). We use Yambo as released.
+- **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so `04` exercises the multi-GPU code path but says nothing about multi-GPU performance; `07` measures that.
 - **CUDA-aware MPI.** The GPU build prints `mpi_built_with_cuda_support` (`true` for nvhpc 25.7's HPC-X). If it says `false`, the build still works, but MPI buffers are copied through host memory.
 - **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6. Another QE version might write output `p2y` cannot read; `03` then stops with `p2y`'s error.
 

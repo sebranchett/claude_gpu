@@ -20,8 +20,9 @@ if flavour == "gpu" then
             "Built with nvhpc/" .. nvhpc .. " for the gpu-a100 and gpu-a100-small partitions.\n" ..
             "Launch with: srun --mpi=pmix yambo ...   (one MPI task per GPU, --gpus-per-task=1)\n"
 else
-    about = "Yambo " .. version .. ", CPU build (OpenMP, MPI, SLEPc), reference for the GPU build.\n" ..
-            "Built with nvhpc/" .. nvhpc .. " for Sapphire Rapids: use on compute-p2 or the GPU nodes, NOT compute-p1.\n"
+    about = "Yambo " .. version .. ", CPU build (OpenMP, MPI, SLEPc).\n" ..
+            "Built with nvhpc/" .. nvhpc .. " for Cascade Lake: runs on compute-p1, compute-p2 and the GPU nodes,\n" ..
+            "e.g. with #SBATCH --partition=compute-p1,compute-p2\n"
 end
 help(about .. "Inside a Slurm job always start yambo/p2y/ypp with srun --mpi=pmix, even for one\n" ..
      "process: started directly, MPI_Init fails.")

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=yambo-qe-prep
-#SBATCH --partition=compute-p2
+#SBATCH --partition=compute-p1,compute-p2
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=16
 #SBATCH --cpus-per-task=1
