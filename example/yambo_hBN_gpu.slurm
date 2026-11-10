@@ -33,23 +33,28 @@
 # (2 MIG slices: quicker through the queue, but not representative of performance),
 # override the layout when submitting:
 #   sbatch --partition=gpu-a100-small --ntasks=2 --cpus-per-task=2 --mem-per-cpu=7500M yambo_hBN_gpu.slurm
+#
+# This script is also the test of the installation (run_tests.sh in the build scripts),
+# which sets the variables below that end in ':-...' to its own values.
 
 set -eo pipefail    # stop at the first error
 trap 'echo "ERROR: the last command failed; see the log_*.txt and gen_*.log files in ${RUN:-the run directory}"' ERR
 
 # Your SAVE directory (made by p2y; see step 1 above). It is copied, not changed.
-SAVE_SRC=/scratch/$USER/yambo_5.3.0_tests/hBN_SAVE/SAVE
-NB=200              # bands used in GW and BSE; at most the number of bands in your SAVE
+SAVE_SRC=${SAVE_SRC:-/scratch/$USER/yambo_5.3.0_tests/hBN_SAVE/SAVE}
+NB=${NB:-200}       # bands used in GW and BSE; at most the number of bands in your SAVE
 # The band ranges below (7-10 for GW, 5-12 for BSE) are for hBN, which has 8 occupied
 # bands. For another material, choose them around its own band gap.
+# Each run gets its own directory.
+RUN=${RUN:-/scratch/$USER/yambo_hBN_example/$SLURM_JOB_ID}
 
 [ -d "$SAVE_SRC" ] || { echo "ERROR: no SAVE directory at $SAVE_SRC; set SAVE_SRC in this script"; exit 1; }
 
 # Software. The module loads nvhpc and sets up its MPI.
 type module > /dev/null 2>&1 || source /etc/profile
 module purge
-module use /projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles
-module load yambo-gpu/5.3.0
+module use "${YAMBO_MODULES:-/projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles}"
+module load "${YAMBO_MODULE:-yambo-gpu/5.3.0}"
 
 # OpenMP threads per MPI task, each thread on its own core.
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
@@ -62,10 +67,10 @@ YAMBO1="srun --nodes=1 --ntasks=1 --mpi=pmix yambo"    # one task, to write inpu
 
 echo "Yambo: $(which yambo)"
 echo "Layout: $SLURM_NTASKS MPI tasks x $OMP_NUM_THREADS OpenMP threads on $(hostname)"
-nvidia-smi -L
+# Each task should have its own CPUs (and, on GPU nodes, its own GPU).
+srun --mpi=pmix bash -c 'echo "task $SLURM_PROCID: CPUs $(taskset -cp $$ | sed "s/.*: //") GPU ${CUDA_VISIBLE_DEVICES:-none}"' | sort -V | awk 'NR <= 8'
+if command -v nvidia-smi > /dev/null; then nvidia-smi -L; fi
 
-# Each run gets its own directory with a private copy of SAVE.
-RUN=/scratch/$USER/yambo_hBN_example/$SLURM_JOB_ID
 mkdir -p "$RUN"
 cp -r "$SAVE_SRC" "$RUN/"
 cd "$RUN"
@@ -91,6 +96,19 @@ set_block() {
     sed -i -E "/^ *% *$2([ #].*)?$/{n;s/.*/ $3/}" "$1"
 }
 
+# run_step NAME INPUT : run yambo on all tasks, check it finished, record the wall time.
+# NAME is Yambo's job name (-J): its output files are o-NAME.*, its report r-NAME_*.
+printf "label\tstep\tseconds\n" > timings.tsv
+run_step() {
+    local step=${1%%,*} t0 secs
+    t0=$(date +%s.%N)
+    $YAMBO -F "$2" -J "$1" > "log_$step.txt" 2>&1
+    secs=$(awk -v a="$t0" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
+    grep -qs "Game Over" r-"$step"_* || { echo "ERROR: yambo $step did not finish (no 'Game Over' in its report)"; exit 1; }
+    printf "%s\t%s\t%s\n" "$(basename "$RUN")" "$step" "$secs" >> timings.tsv
+    echo "$step took $secs s"
+}
+
 # --- 1. GW --------------------------------------------------------------------
 # -p p: plasmon-pole screening, -g n: Newton solver, -V qp: show the QP variables
 echo "== GW"
@@ -101,9 +119,7 @@ set_var   gw.in NGsBlkXp "8 Ry"          # size of the screening matrix
 set_block gw.in GbndRnge "1 | $NB |"     # bands in the self-energy
 # QP corrections for bands 7-10 (top two valence, bottom two conduction) at all k-points
 sed -i -E "/^ *% *QPkrange([ #].*)?$/{n;s/^( *[0-9]+ *\| *[0-9]+ *\|).*/\1 7 | 10 |/}" gw.in
-SECONDS=0
-$YAMBO -F gw.in -J gw > log_gw.txt 2>&1
-echo "GW took $SECONDS s"
+run_step gw gw.in
 
 # --- 2. BSE, Haydock solver ---------------------------------------------------
 # -X s: static screening, -o b: BSE optics, -k sex: screened exchange kernel, -y h: Haydock
@@ -117,9 +133,7 @@ set_var   bse_h.in BSENGBlk "6 Ry"                # screened part of the kernel
 set_block bse_h.in BEnRange "2.0 | 10.0 | eV"     # spectrum energy range
 set_var   bse_h.in BEnSteps "500"
 set_var   bse_h.in KfnQPdb '"E < ./gw/ndb.QP"'    # use the GW energies from step 1
-SECONDS=0
-$YAMBO -F bse_h.in -J bse_h > log_bse_h.txt 2>&1
-echo "BSE (Haydock) took $SECONDS s"
+run_step bse_h bse_h.in
 
 # --- 3. BSE, SLEPc solver -----------------------------------------------------
 # -y s: SLEPc. '-J bse_s,bse_h' also reads the screening and kernel from step 2.
@@ -132,14 +146,13 @@ set_block bse_s.in BEnRange "2.0 | 10.0 | eV"
 set_var   bse_s.in BEnSteps "500"
 set_var   bse_s.in BSSNEig "20"                   # number of excitons
 set_var   bse_s.in KfnQPdb '"E < ./gw/ndb.QP"'
-SECONDS=0
-$YAMBO -F bse_s.in -J bse_s,bse_h > log_bse_s.txt 2>&1
-echo "BSE (SLEPc) took $SECONDS s"
+run_step bse_s,bse_h bse_s.in
 
 # --- Results ------------------------------------------------------------------
 # o-*: output data (QP corrections, spectra, excitons); r-*: reports with timings.
 echo "== Results in $RUN"
 ls o-* r-*
+cat timings.tsv
 echo "== QP corrections (o-gw.qp), first lines"
 grep -m1 -E '^# *K-point' o-gw.qp || true
 awk '!/^#/ && n++ < 8' o-gw.qp

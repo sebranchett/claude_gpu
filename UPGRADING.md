@@ -12,7 +12,7 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
    - `mpi_built_with_cuda_support:true` in the GPU build output.
    - `EXT_CHECKS` in `build_yambo.sh` against the `do_*` switches in the new `config/mk/global/defs.mk`: a library Yambo added or renamed needs a line there, or a silent failure goes unnoticed.
 5. **SAVE** (`03`). Check that the new `p2y` reads the project QE's output.
-6. **Tests** (`04`, `05`, `07`, `08`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `run_tests.sh` and `example/yambo_hBN_gpu.slurm`.
+6. **Tests** (`04`, `05`, `07`, `08`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `example/yambo_hBN_gpu.slurm` (the tests run that script). Also update the module and SAVE defaults at its top.
 7. **Compare** (`06`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
 8. **Known limitation.** Check whether the GPU screening is still single-threaded (see [Yambo behaviour](#yambo-behaviour-worth-knowing)); if the new version fixes it, update README.
 

@@ -13,7 +13,7 @@ from pathlib import Path
 
 QP_TOL_EV = 0.005   # max |difference| in QP corrections (E-Eo), eV
 REL_TOL = 0.01      # max difference in other outputs, relative to the column's largest value
-# Haydock stops once its own estimate of the error is below BSHayTrs (2 % in run_tests.sh, Yambo's
+# Haydock stops once its own estimate of the error is below BSHayTrs (2 % in the test, Yambo's
 # default), and its Lanczos recursion in single precision amplifies rounding differences between
 # parallel layouts, so its spectra can only be expected to agree to that accuracy.
 HAYDOCK_TOL = 0.02
