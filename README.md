@@ -1,6 +1,6 @@
-# Yambo 5.3.0 GPU build on DelftBlue
+# Yambo 5.3.0 on DelftBlue: GPU and CPU builds
 
-Scripts that build Yambo 5.3.0 for the A100 GPU nodes of DelftBlue, plus a CPU-only reference build, and validate both with a GW + BSE run on bulk hBN.
+Scripts that build Yambo 5.3.0 for DelftBlue twice, for the A100 GPU nodes and for the CPU nodes (one build for both compute-p1 and compute-p2), and validate both with a GW + BSE run on bulk hBN.
 
 **Building a newer Yambo version?** Start with [UPGRADING.md](UPGRADING.md): a checklist, the DelftBlue problems we hit and their fixes, and the 5.3.0 reference results.
 
@@ -15,10 +15,10 @@ Scripts that build Yambo 5.3.0 for the A100 GPU nodes of DelftBlue, plus a CPU-o
 
 ## Layout
 
-Each Yambo version gets its own directory, `/projects/electronic_structure/yambo_gpu_<version>_<stack>`, set in `common.sh` (`YAMBO_VERSION`, and `STACK` for the DelftBlue software stack). A new version is built next to the old one, which stays usable. For 5.3.0:
+Each Yambo version gets its own directory, `/projects/electronic_structure/yambo_<version>_<stack>`, set in `common.sh` (`YAMBO_VERSION`, and `STACK` for the DelftBlue software stack). A new version is built next to the old one, which stays usable. For 5.3.0:
 
 ```
-/projects/electronic_structure/yambo_gpu_5.3.0_2026/
+/projects/electronic_structure/yambo_5.3.0_2026/
   scripts/                 this repository
   src/                     Yambo + library tarballs, hBN tutorial (from 00_fetch_sources.sh)
   build/gpu/yambo-5.3.0/   GPU build tree = installation (bin/), do not delete
@@ -65,7 +65,7 @@ Copy this directory to DelftBlue as `scripts/` in the project directory and subm
    It checks that every output file agrees (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %, the solver's own accuracy) and prints each step's wall time with speed-ups relative to the compute-p1 run.
 6. **Keep the reference**, once validation has passed. The CPU run's outputs, reports and timings are all `08_compare.py` needs:
    ```bash
-   ref=/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p1_5.3.0
+   ref=/projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p1_5.3.0
    mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p1/{o-*,r-*,timings.tsv} $ref/
    ```
    The next version is then also compared with this one (see [UPGRADING.md](UPGRADING.md)).
@@ -97,7 +97,7 @@ The test is defined in one place, `example/yambo_hBN_gpu.slurm`, which is also t
 ## Using the installation
 
 ```bash
-module use /projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles
+module use /projects/electronic_structure/yambo_5.3.0_2026/modulefiles
 module load yambo-gpu/5.3.0
 ```
 

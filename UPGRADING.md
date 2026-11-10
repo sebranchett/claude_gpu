@@ -4,16 +4,17 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
 
 ## Checklist for a new version
 
-1. **Version number.** Set `YAMBO_VERSION` in `common.sh` (and `STACK`, if DelftBlue has a newer software stack). That gives a new project directory, `yambo_gpu_<version>_<stack>`, next to the old one; copy the scripts there. The modulefile (`modulefiles/yambo.lua`) needs no change for a new Yambo version: it takes the version from the name it is installed under. Find any other hard-coded version with `git grep -n 5.3.0`.
+1. **Version number.** Set `YAMBO_VERSION` in `common.sh` (and `STACK`, if DelftBlue has a newer software stack). That gives a new project directory, `yambo_<version>_<stack>`, next to the old one; copy the scripts there. The modulefile (`modulefiles/yambo.lua`) needs no change for a new Yambo version: it takes the version from the name it is installed under. Find any other hard-coded version with `git grep -n 5.3.0`.
 2. **Toolchain.** If DelftBlue has a newer software stack or `nvhpc`, update the three settings at the top of `modulefiles/yambo.lua`: `stack` (same as `STACK` in `common.sh`), `nvhpc`, and the HPC-X path (`comm_libs/<cuda>/hpcx/hpcx-<version>`; look it up in the new nvhpc, see [MPI](#delftblue-lessons)). The builds load the toolchain from this modulefile too. Check the Yambo wiki's NVfortran page for changed configure flags.
 3. **Downloads** (`00_fetch_sources.sh`, login node). Check that every library downloaded. In 5.3.0, `yaml-0.2.2` was missing from Yambo's mirror and is fetched from pyyaml.org instead; that workaround may no longer be needed, or another library may need one.
 4. **Builds** (`01`, `02`). A new version gets a new build tree, so it starts fresh. Check:
    - `config/report`: CUDA Fortran, MPI, OpenMP, parallel HDF5 I/O, SLEPc and ScaLAPACK on.
    - `mpi_built_with_cuda_support:true` in the GPU build output.
+   - `-tp cascadelake` in the CPU build output (it must run on compute-p1; see [DelftBlue lessons](#delftblue-lessons)).
    - `EXT_CHECKS` in `build_yambo.sh` against the `do_*` switches in the new `config/mk/global/defs.mk`: a library Yambo added or renamed needs a line there, or a silent failure goes unnoticed.
 5. **SAVE** (`03`). Check that the new `p2y` reads the project QE's output.
 6. **Tests** (`04`–`07`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `example/yambo_hBN_gpu.slurm` (the tests run that script). Also update the module and SAVE defaults at its top.
-7. **Compare** (`08`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p1_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
+7. **Compare** (`08`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p1_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
 8. **Known limitation.** Check whether the GPU screening is still single-threaded (see [Yambo behaviour](#yambo-behaviour-worth-knowing)); if the new version fixes it, update README.
 
 ## DelftBlue lessons
@@ -43,7 +44,7 @@ Also: compute and GPU nodes have no internet (downloads on a login node); the lo
 
 | Topic | Decision |
 |---|---|
-| Install location | `/projects/electronic_structure/yambo_gpu_<version>_<stack>`, one per version (5.3.0: `yambo_gpu_5.3.0_2026`, first installed as `yambo_gpu_2026`, now a link); the build tree is the installation (never delete `build/`). |
+| Install location | `/projects/electronic_structure/yambo_<version>_<stack>`, one per version (5.3.0: `yambo_5.3.0_2026`, first installed as `yambo_gpu_2026`, now a link); the build tree is the installation (never delete `build/`). |
 | Account | `research-as-cheme` |
 | Toolchain | `module load 2026; module load compilers gcc; module load nvhpc/25.7` |
 | GPU mode | `--enable-cuda-fortran --with-cuda-cc=80`, CUDA runtime = newest nvhpc CUDA the driver supports (12.9 with driver CUDA 13.4). |
@@ -67,10 +68,10 @@ Wall times vary about 8 % between identical runs. `gpu_a100_1gpu` came from a be
 
 ## One-off: renaming the 5.3.0 installation
 
-5.3.0 was first installed as `yambo_gpu_2026`, before the `yambo_gpu_<version>_<stack>` naming. To move it, on a login node:
+5.3.0 was first installed as `yambo_gpu_2026`, before the `yambo_<version>_<stack>` naming. To move it, on a login node:
 
 ```bash
-cd /projects/electronic_structure && mv yambo_gpu_2026 yambo_gpu_5.3.0_2026 && ln -s yambo_gpu_5.3.0_2026 yambo_gpu_2026
+cd /projects/electronic_structure && mv yambo_gpu_2026 yambo_5.3.0_2026 && ln -s yambo_5.3.0_2026 yambo_gpu_2026
 ```
 
 The link keeps the old path working, which the installed binaries and libraries may still refer to. Then install the new modulefiles, from the new `scripts/` directory (the next `01`, `02` or `03` job would also do this):
@@ -81,16 +82,16 @@ for f in gpu cpu; do cp modulefiles/yambo.lua ../modulefiles/yambo-$f/5.3.0.lua;
 
 ## One-off: replacing the 5.3.0 CPU build with the portable one
 
-The first CPU build was made on compute-p2 and may not run on compute-p1. To replace it:
+The first CPU build was made on compute-p2 and may not run on compute-p1. To replace it, after the renaming above:
 
 1. Keep its test results first, as the reference for the new build (the new `06` overwrites `cpu_p2`):
    ```bash
-   ref=/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0_first_build
+   ref=/projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p2_5.3.0_first_build
    mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p2/{o-*,r-*,timings.tsv} $ref/
    ```
 2. Rebuild on compute-p1 from scratch, `sbatch --export=ALL,FRESH=1 02_build_cpu.slurm`; `yambo-cpu/5.3.0` is unusable until it ends with `BUILD OK`. Check that the job output says `-tp cascadelake`. The SAVE from `03` is plain data and can stay.
 3. `sbatch 05_test_cpu_p1.slurm` and `sbatch 06_test_cpu_p2.slurm`, then compare with the first build and the GPU runs:
    ```bash
-   python3 -I 08_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p1,cpu_p2,gpu_small,gpu_a100_4gpu} /projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0_first_build
+   python3 -I 08_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p1,cpu_p2,gpu_small,gpu_a100_4gpu} /projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p2_5.3.0_first_build
    ```
 4. Keep `cpu_p1` as the 5.3.0 reference (README step 6).

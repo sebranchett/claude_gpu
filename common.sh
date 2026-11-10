@@ -5,7 +5,7 @@ STACK=2026                              # DelftBlue software stack: 'module load
 QE_MODULE_PATH=/projects/electronic_structure/.modulefiles   # project QE modules (module use --append)
 QE_MODULE=qe
 
-PROJ=/projects/electronic_structure/yambo_gpu_${YAMBO_VERSION}_$STACK   # one directory per version and stack
+PROJ=/projects/electronic_structure/yambo_${YAMBO_VERSION}_$STACK   # one directory per version and stack
 SRC_DIR=$PROJ/src                       # downloaded tarballs (filled on the login node)
 BUILD_ROOT=$PROJ/build                  # build trees; also the install location, do not delete
 MODULE_DIR=$PROJ/modulefiles

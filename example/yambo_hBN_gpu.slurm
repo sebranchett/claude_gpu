@@ -53,7 +53,7 @@ RUN=${RUN:-/scratch/$USER/yambo_hBN_example/$SLURM_JOB_ID}
 # Software. The module loads nvhpc and sets up its MPI.
 type module > /dev/null 2>&1 || source /etc/profile
 module purge
-module use "${YAMBO_MODULES:-/projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles}"
+module use "${YAMBO_MODULES:-/projects/electronic_structure/yambo_5.3.0_2026/modulefiles}"
 module load "${YAMBO_MODULE:-yambo-gpu/5.3.0}"
 
 # OpenMP threads per MPI task, each thread on its own core.

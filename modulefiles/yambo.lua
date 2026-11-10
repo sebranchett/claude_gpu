@@ -11,7 +11,7 @@ local hpcx  = "/apps/generic/hpc_sdk/Linux_x86_64/" .. nvhpc .. "/comm_libs/12.9
 local version = myModuleVersion()                          -- e.g. "5.3.0"
 local flavour = myModuleName():match("yambo%-(%a+)")       -- "gpu" or "cpu"
 -- Same as PROJ in common.sh.
-local root = "/projects/electronic_structure/yambo_gpu_" .. version .. "_" .. stack ..
+local root = "/projects/electronic_structure/yambo_" .. version .. "_" .. stack ..
              "/build/" .. flavour .. "/yambo-" .. version
 
 local about
