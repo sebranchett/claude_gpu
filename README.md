@@ -96,6 +96,12 @@ module load yambo-gpu/5.3.0
 
 In a GPU job use one MPI task per GPU (`--gpus-per-task=1`), several OpenMP threads per task, and launch with `srun --mpi=pmix yambo ...`. On `gpu-a100` that means up to 4 tasks per node with up to 16 cores each.
 
+### Example job for users
+
+`example/yambo_hBN_gpu.slurm` is a standalone version of the hBN test for users who just want to run Yambo. It does not need these scripts. It loads the `yambo-gpu/5.3.0` module, copies the user's SAVE to `/scratch/$USER/yambo_hBN_example/<job id>`, runs Yambo's setup if the SAVE has not had it, and then runs GW, BSE Haydock and BSE SLEPc on one full `gpu-a100` node (4 tasks, one A100 each). A comment in the script shows how to run it on `gpu-a100-small` instead.
+
+Users make their own SAVE for bulk hBN: Quantum ESPRESSO scf + nscf with the tutorial's inputs, converted with `p2y`. For how to do that, see [01_scf.sh in MoS2-QE-Yambo-pnas](https://github.com/sebranchett/MoS2-QE-Yambo-pnas/blob/main/01_scf.sh) or the [Simulation Suite](https://simulationsuite.streamlit.app/). They then copy `yambo_hBN_gpu.slurm` to their own directory, set `SAVE_SRC` and `--account` in it, and submit it with `sbatch`. By default `SAVE_SRC` points at the SAVE that step 03 makes, so you can run the example yourself without changing it.
+
 Inside a Slurm job, always start `yambo`, `p2y` and `ypp` with `srun --mpi=pmix`, even for a single process: started directly, HPC-X's Open MPI fails in `MPI_Init`. The modulefiles set `OPAL_PREFIX` and add HPC-X's libraries to `LD_LIBRARY_PATH`, which the `nvhpc` module does not do.
 
 ## Checking for open-source code in these scripts
