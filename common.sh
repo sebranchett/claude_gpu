@@ -20,14 +20,22 @@ umask 022
 # flavour = gpu | cpu
 yambo_tree() { echo "$BUILD_ROOT/$1/yambo-$YAMBO_VERSION"; }
 
-# load_toolchain gpu|cpu : compilers, MPI and Yambo from this repository's modulefile
-# (the stack, gcc for libatomic, nvhpc, and HPC-X's MPI settings; see UPGRADING.md),
+# install_modulefile gpu|cpu : install modulefiles/yambo.lua as yambo-<flavour>/<version>.lua
+# in $MODULE_DIR; the modulefile takes the flavour and version from that name.
+install_modulefile() {
+    mkdir -p "$MODULE_DIR/yambo-$1"
+    cp "$SCRIPT_DIR/modulefiles/yambo.lua" "$MODULE_DIR/yambo-$1/$YAMBO_VERSION.lua"
+}
+
+# load_toolchain gpu|cpu : compilers, MPI and Yambo from our modulefile (the stack, gcc
+# for libatomic, nvhpc, and HPC-X's MPI settings; see UPGRADING.md), installed first,
 # so the builds get the same environment as the tests and users.
 load_toolchain() {
+    install_modulefile "$1"
     set +u      # Lmod and /etc/profile are not written for 'set -u'
     type -t module > /dev/null || source /etc/profile   # child shells may lack 'module'
     module purge
-    module use "$SCRIPT_DIR/modulefiles"
+    module use "$MODULE_DIR"
     module load "yambo-$1/$YAMBO_VERSION"
     set -u
     echo "Toolchain: $(command -v nvfortran mpif90 | tr '\n' ' ')OPAL_PREFIX=$OPAL_PREFIX"

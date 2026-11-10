@@ -4,8 +4,8 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
 
 ## Checklist for a new version
 
-1. **Version number.** Set `YAMBO_VERSION` in `common.sh` (and `STACK`, if DelftBlue has a newer software stack). That gives a new project directory, `yambo_gpu_<version>_<stack>`, next to the old one; copy the scripts there. Copy both modulefiles to the new version's name and change the version, the `root` path and `load("<stack>")` inside them. Find any other hard-coded version with `git grep -n 5.3.0`.
-2. **Toolchain.** If DelftBlue has a newer `nvhpc`, update the `nvhpc` version and the HPC-X path in both modulefiles (the builds load the toolchain from them too) (`comm_libs/<cuda>/hpcx/hpcx-<version>`, see [MPI](#delftblue-lessons)). Check the Yambo wiki's NVfortran page for changed configure flags.
+1. **Version number.** Set `YAMBO_VERSION` in `common.sh` (and `STACK`, if DelftBlue has a newer software stack). That gives a new project directory, `yambo_gpu_<version>_<stack>`, next to the old one; copy the scripts there. The modulefile (`modulefiles/yambo.lua`) needs no change for a new Yambo version: it takes the version from the name it is installed under. Find any other hard-coded version with `git grep -n 5.3.0`.
+2. **Toolchain.** If DelftBlue has a newer software stack or `nvhpc`, update the three settings at the top of `modulefiles/yambo.lua`: `stack` (same as `STACK` in `common.sh`), `nvhpc`, and the HPC-X path (`comm_libs/<cuda>/hpcx/hpcx-<version>`; look it up in the new nvhpc, see [MPI](#delftblue-lessons)). The builds load the toolchain from this modulefile too. Check the Yambo wiki's NVfortran page for changed configure flags.
 3. **Downloads** (`00_fetch_sources.sh`, login node). Check that every library downloaded. In 5.3.0, `yaml-0.2.2` was missing from Yambo's mirror and is fetched from pyyaml.org instead; that workaround may no longer be needed, or another library may need one.
 4. **Builds** (`01`, `02`). A new version gets a new build tree, so it starts fresh. Check:
    - `config/report`: CUDA Fortran, MPI, OpenMP, parallel HDF5 I/O, SLEPc and ScaLAPACK on.

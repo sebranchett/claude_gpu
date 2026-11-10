@@ -21,7 +21,7 @@ Each Yambo version gets its own directory, `/projects/electronic_structure/yambo
   src/                     Yambo + library tarballs, hBN tutorial (from 00_fetch_sources.sh)
   build/gpu/yambo-5.3.0/   GPU build tree = installation (bin/), do not delete
   build/cpu/yambo-5.3.0/   CPU build tree = installation
-  modulefiles/             yambo-gpu/5.3.0.lua, yambo-cpu/5.3.0.lua
+  modulefiles/             yambo-gpu/5.3.0.lua, yambo-cpu/5.3.0.lua (copies of scripts/modulefiles/yambo.lua)
   reference/cpu_p2_5.3.0/  validated test results, to compare the next version with (step 6)
 ```
 
@@ -31,7 +31,13 @@ Each Yambo version gets its own directory, `/projects/electronic_structure/yambo
 cd /projects/electronic_structure && mv yambo_gpu_2026 yambo_gpu_5.3.0_2026 && ln -s yambo_gpu_5.3.0_2026 yambo_gpu_2026
 ```
 
-The link keeps the old path working, which the installed binaries and libraries may still refer to. Then copy the updated `modulefiles/*/5.3.0.lua` to the new `modulefiles/`.
+The link keeps the old path working, which the installed binaries and libraries may still refer to. The next build or `03` job installs the new modulefiles; to install them straight away, run from the new `scripts/` directory:
+
+```bash
+for f in gpu cpu; do cp modulefiles/yambo.lua ../modulefiles/yambo-$f/5.3.0.lua; done
+```
+
+There is one modulefile, `modulefiles/yambo.lua`, for both builds and every version: installed as `yambo-gpu/<version>.lua` or `yambo-cpu/<version>.lua`, it takes the flavour and version from that name. Every job that loads the toolchain (`01`, `02`, `03`) installs it first and then loads it, so builds, tests and users all get the same environment.
 
 Test runs go to `/scratch/$USER/yambo_5.3.0_tests`.
 

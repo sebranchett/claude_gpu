@@ -201,7 +201,5 @@ ls -l bin/
 for exe in yambo p2y ypp; do [ -x "bin/$exe" ] || die "bin/$exe missing"; done
 if ldd bin/yambo | grep -i 'not found'; then die "unresolved shared libraries in bin/yambo"; fi
 
-mkdir -p "$MODULE_DIR/yambo-$flavour"
-cp "$SCRIPT_DIR/modulefiles/yambo-$flavour/$YAMBO_VERSION.lua" "$MODULE_DIR/yambo-$flavour/"
-echo "Installed modulefile $MODULE_DIR/yambo-$flavour/$YAMBO_VERSION.lua"
+echo "Modulefile (installed by load_toolchain): $MODULE_DIR/yambo-$flavour/$YAMBO_VERSION.lua"
 echo "BUILD OK"
