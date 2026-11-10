@@ -77,7 +77,7 @@ Set these as environment variables when submitting, for example `sbatch --export
 
 ## The test
 
-Bulk hBN from the Yambo tutorials: 4 atoms, 6×6×2 k-grid (14 k-points), 40 Ry cutoff, 200 bands.
+Bulk hBN from the Yambo tutorials ([tutorial page](https://wiki.yambo-code.eu/wiki/index.php?title=Bulk_material:_h-BN), [input files](https://media.yambo-code.eu/educational/tutorials/files/hBN.tar.gz), downloaded by `00_fetch_sources.sh`), with more bands and our own GW and BSE parameters: 4 atoms, 6×6×2 k-grid (14 k-points), 40 Ry cutoff, 200 bands.
 
 | Step | What | Main parameters |
 |---|---|---|
