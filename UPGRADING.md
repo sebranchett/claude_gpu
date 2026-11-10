@@ -1,6 +1,6 @@
 # Upgrading to a new Yambo version
 
-What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next version starts from the answers rather than the debugging. The full diary of build attempts is in the git history of `HANDOFF.md`.
+What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next version starts from the answers rather than the debugging.
 
 ## Checklist for a new version
 
