@@ -12,8 +12,8 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
    - `mpi_built_with_cuda_support:true` in the GPU build output.
    - `EXT_CHECKS` in `build_yambo.sh` against the `do_*` switches in the new `config/mk/global/defs.mk`: a library Yambo added or renamed needs a line there, or a silent failure goes unnoticed.
 5. **SAVE** (`03`). Check that the new `p2y` reads the project QE's output.
-6. **Tests** (`04`, `05`, `07`, `08`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `example/yambo_hBN_gpu.slurm` (the tests run that script). Also update the module and SAVE defaults at its top.
-7. **Compare** (`06`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
+6. **Tests** (`04`, `05`, `06`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `example/yambo_hBN_gpu.slurm` (the tests run that script). Also update the module and SAVE defaults at its top.
+7. **Compare** (`07`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
 8. **Known limitation.** Check whether the GPU screening is still single-threaded (see [Yambo behaviour](#yambo-behaviour-worth-knowing)); if the new version fixes it, update README.
 
 ## DelftBlue lessons
@@ -36,7 +36,7 @@ Also: compute and GPU nodes have no internet (downloads on a login node); the lo
 ## Yambo behaviour worth knowing
 
 - **GPU screening runs on one host thread.** The independent-particle response `Xo`, in both GW and the BSE static screening, is computed by host code with one OpenMP thread: the GPU build forces `n_threads_X=1` (`src/pol_function/X_irredux.F`, around line 191) whatever `X_Threads` says. Its inner `X T_space Kernel sum` took 35 s of work in total on 2 MIG slices (2 tasks × 17.5 s) and on a full A100 (1 task × 35.1 s): the GPU size makes no difference, only the number of MPI tasks splitting it does. So use several MPI tasks; one task on one big GPU is the worst layout. We decided not to modify or investigate Yambo's source.
-- **Haydock accuracy.** The Haydock solver stops at about 2 % accuracy (`BSHayTrs=-0.02`), and runs with different parallel layouts differ by up to that much, most in the EEL spectrum. `06_compare.py` judges `haydock` files at 2 % for that reason.
+- **Haydock accuracy.** The Haydock solver stops at about 2 % accuracy (`BSHayTrs=-0.02`), and runs with different parallel layouts differ by up to that much, most in the EEL spectrum. `07_compare.py` judges `haydock` files at 2 % for that reason.
 - **Build defaults.** Yambo's nvfortran flags are `-O1 -gopt`, in single precision; we kept them. In 5.3.0, OpenACC force-disables OpenMP, which is why we use CUDA Fortran.
 
 ## Decisions
@@ -63,7 +63,7 @@ All runs agree with `cpu_p2` within tolerance (QP within 0.56 meV). Valence QP c
 | bse_h | 29.3 s | 70.0 s | 131.6 s |
 | bse_s | 12.1 s | 8.0 s | 8.0 s |
 
-Wall times vary about 8 % between identical runs. The 4-GPU run (`08`) was pending when this was written.
+Wall times vary about 8 % between identical runs. `gpu_a100_1gpu` came from a benchmark job that has since been dropped: its finding (with a single MPI task, one host thread does all of the screening) is under [Yambo behaviour](#yambo-behaviour-worth-knowing). The 4-GPU run (`06_bench_gpu_a100.slurm`, label `gpu_a100_4gpu`) was pending when this was written.
 
 ## One-off: renaming the 5.3.0 installation
 

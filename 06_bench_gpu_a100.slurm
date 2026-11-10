@@ -10,8 +10,8 @@
 #SBATCH --account=research-as-cheme
 #SBATCH --output=%x-%j.out
 
-# Optional: the same test on a whole gpu-a100 node, 4 MPI tasks with one A100
-# each and 16 OpenMP threads per task. All 4 GPUs are on one node, so ranks can
-# exchange data GPU-to-GPU through CUDA-aware MPI. Compare with 07 (one task)
-# to see how well the screening step splits across tasks.
+# Optional benchmark, laid out as production jobs should be: a whole gpu-a100 node,
+# 4 MPI tasks with one A100 each and 16 OpenMP threads per task. All 4 GPUs are on one
+# node, so tasks exchange data GPU-to-GPU through CUDA-aware MPI. (One task on one
+# A100 is the worst layout for Yambo 5.3.0's screening step: see UPGRADING.md.)
 bash "$SLURM_SUBMIT_DIR/run_tests.sh" gpu gpu_a100_4gpu

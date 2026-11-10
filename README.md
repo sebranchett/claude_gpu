@@ -54,16 +54,15 @@ Copy this directory to DelftBlue as `scripts/` in the project directory and subm
    ```bash
    sbatch 04_test_gpu_small.slurm
    sbatch 05_test_cpu_p2.slurm
-   sbatch 07_bench_gpu_a100.slurm
-   sbatch 08_bench_gpu_a100_4gpu.slurm
+   sbatch 06_bench_gpu_a100.slurm
    ```
-   The last two are optional benchmarks: `07` runs one task on one full A100, `08` runs 4 tasks on a whole `gpu-a100` node (4 A100s, 16 threads each), as in production.
+   The last one is an optional benchmark: 4 tasks on a whole `gpu-a100` node (4 A100s, 16 threads each), as in production.
 5. **Compare**, on a login node. The first run is the reference; leave out runs you did not do:
    ```bash
-   python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_1gpu,gpu_a100_4gpu}
+   python3 -I 07_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_4gpu}
    ```
    It checks that every output file agrees (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %, the solver's own accuracy) and prints each step's wall time with speed-ups relative to the CPU node.
-6. **Keep the reference**, once validation has passed. The CPU run's outputs, reports and timings are all `06_compare.py` needs:
+6. **Keep the reference**, once validation has passed. The CPU run's outputs, reports and timings are all `07_compare.py` needs:
    ```bash
    ref=/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0
    mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p2/{o-*,r-*,timings.tsv} $ref/
@@ -79,8 +78,8 @@ Set these when submitting, for example `sbatch --export=ALL,FRESH=1 01_build_gpu
 | `FRESH=1` | `01`, `02` | off | Deletes the build tree and builds from scratch. Leave it out when resubmitting a build that timed out, or it starts over again. |
 | `CUDA_RUNTIME=X.Y` | `01` | newest nvhpc CUDA the driver supports | CUDA version for `--with-cuda-runtime`. Only used by configure, so combine it with `FRESH=1` on an existing tree. |
 | `NBND=N` | `03` | 200 | Bands in the QE nscf run. |
-| `NB=N` | `04`, `05`, `07`, `08` | 200 | Bands used in GW and BSE; at most the bands in the SAVE. |
-| `LABEL=name` | `04`, `05`, `07`, `08` | `gpu_small`, `cpu_p2`, `gpu_a100_1gpu`, `gpu_a100_4gpu` | Run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
+| `NB=N` | `04`, `05`, `06` | 200 | Bands used in GW and BSE; at most the bands in the SAVE. |
+| `LABEL=name` | `04`, `05`, `06` | `gpu_small`, `cpu_p2`, `gpu_a100_4gpu` | Run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
 
 ## The test
 
@@ -108,7 +107,7 @@ In a GPU job use one MPI task per GPU (`--gpus-per-task=1`) and several OpenMP t
 ## Known limitations
 
 - **Screening is slow on the GPU.** Yambo's GPU build computes the screening (`Xo (procedure)` in the `r-*` reports) with a single host thread, whatever `X_Threads` says, and a bigger GPU does not help. With 2 tasks on 2 MIG slices GW is still about 1.7× faster than a compute-p2 node, but BSE Haydock is about 2.4× slower; with one task on a full A100, GW is no faster and BSE Haydock about 4.5× slower. More MPI tasks split the screening. Details in [UPGRADING.md](UPGRADING.md). We use Yambo as released.
-- **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so `04` exercises the multi-GPU code path but says nothing about multi-GPU performance; `08` measures that.
+- **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so `04` exercises the multi-GPU code path but says nothing about multi-GPU performance; `06` measures that.
 - **CUDA-aware MPI.** The GPU build prints `mpi_built_with_cuda_support` (`true` for nvhpc 25.7's HPC-X). If it says `false`, the build still works, but MPI buffers are copied through host memory.
 - **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6. Another QE version might write output `p2y` cannot read; `03` then stops with `p2y`'s error.
 

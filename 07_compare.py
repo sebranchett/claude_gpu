@@ -2,7 +2,7 @@
 """Compare Yambo test runs: numerical agreement of the outputs and wall times.
 
 Usage (on a login node):
-    python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/cpu_p2 \
+    python3 -I 07_compare.py /scratch/$USER/yambo_5.3.0_tests/cpu_p2 \
                              /scratch/$USER/yambo_5.3.0_tests/gpu_small [more runs ...]
 The first run is the reference; every o-* file it has is compared with the same file
 in the other runs, and wall times are shown as speed-ups relative to the reference.
