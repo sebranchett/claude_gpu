@@ -121,3 +121,7 @@ bash check_license_infringements.sh
 ```
 
 The full result goes to `dependencies.json`. The script prints every entry whose `"id"` is not `"none"`, with some context: each is a file or snippet that SCANOSS matched to an open-source component, whose licence should be checked. If nothing is printed before `Search Complete`, there were no matches.
+
+## Acknowledgements
+
+These scripts were developed by @sebranchett in collaboration with Claude (Anthropic's AI model), working in Claude Code. Claude wrote and revised the scripts and documentation and analysed the job output; @sebranchett ran every job on DelftBlue, brought back the results, and made the decisions about scope, design and what to keep. The DelftBlue lessons in [UPGRADING.md](UPGRADING.md) came out of that back-and-forth.
