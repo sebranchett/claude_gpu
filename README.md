@@ -50,11 +50,12 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    sbatch 04_test_gpu_small.slurm
    sbatch 05_test_cpu_p2.slurm
    sbatch 07_bench_gpu_a100.slurm
+   sbatch 08_bench_gpu_a100_4gpu.slurm
    ```
-   The last one is optional: one full A100, as in production.
-5. **Compare** (login node). The first run is the reference:
+   The last two are optional: `07` runs one task on one full A100, `08` runs 4 tasks on a whole `gpu-a100` node (4 A100s, 16 threads each), as in production.
+5. **Compare** (login node). The first run is the reference; leave out runs you did not do:
    ```bash
-   python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_1gpu}
+   python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_1gpu,gpu_a100_4gpu}
    ```
    It checks that every output file agrees between the runs (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %: Haydock stops at 2 % accuracy, `BSHayTrs`), and prints the wall time of each step with speed-ups relative to the CPU node.
 
@@ -70,9 +71,9 @@ Set these as environment variables when submitting, for example `sbatch --export
 | `AUTOTOOLS_MODULES="a b"` | `01`, `02` | `gpu autoconf automake libtool` (`cpu ...` for `02`) | Modules loaded if the node has no `libtoolize`/`libtool.m4`, which Yambo needs to `autoreconf` LibXC. Only used when the system copy is missing (the job then prints what it tried). |
 | `NBND=N` | `03` | 200 | Number of bands in the QE nscf run. |
 | `USE_TUTORIAL_SAVE=1` | `03` | off | Skips QE + `p2y` and uses the tutorial's ready-made SAVE (100 bands). Then run the tests with `NB=100`. |
-| `NB=N` | `04`, `05`, `07` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |
-| `LABEL=name` | `04`, `05`, `07` | `gpu_small`, `cpu_p2`, `gpu_a100_1gpu` | Name of the run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
-| `LAUNCH="cmd"` | `04`, `05`, `07` | `srun --mpi=pmix` | MPI launcher, for example `LAUNCH="mpirun -np 2"`. See [Known limitations](#known-limitations-and-things-to-check). |
+| `NB=N` | `04`, `05`, `07`, `08` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |
+| `LABEL=name` | `04`, `05`, `07`, `08` | `gpu_small`, `cpu_p2`, `gpu_a100_1gpu`, `gpu_a100_4gpu` | Name of the run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
+| `LAUNCH="cmd"` | `04`, `05`, `07`, `08` | `srun --mpi=pmix` | MPI launcher, for example `LAUNCH="mpirun -np 2"`. See [Known limitations](#known-limitations-and-things-to-check). |
 
 ## The test
 
@@ -111,7 +112,7 @@ The full scan result goes to `dependencies.json`. The script then prints every e
 ## Known limitations and things to check
 
 - **CUDA-aware MPI.** The build job prints `mpi_built_with_cuda_support` from the `ompi_info` it finds in the nvhpc SDK. If it says `false`, or no `ompi_info` is found, the GPU build still works, but MPI buffers are copied through host memory.
-- **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so the 2-task test exercises the multi-GPU code path but says nothing about multi-GPU performance. Use `gpu-a100` with `--ntasks=4` for that.
+- **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so the 2-task test exercises the multi-GPU code path but says nothing about multi-GPU performance. `08_bench_gpu_a100_4gpu.slurm` (4 A100s on one `gpu-a100` node) measures that.
 - **Launcher.** The tests use `srun --mpi=pmix`, which DelftBlue recommends and which gives each rank its own GPU. To try another launcher, set `LAUNCH`, for example `sbatch --export=ALL,LAUNCH="mpirun -np 2" ...`. With `mpirun`, check the per-rank `CUDA_VISIBLE_DEVICES` lines at the top of the job output: with MIG, two ranks must not share a slice.
-- **Screening is slow on the GPU.** Computing the screening (`Xo (procedure)` in the `r-*` reports) takes about 25 s on 2 MIG slices against about 5 s on a full compute-p2 node, in both GW and BSE. Yambo's GPU build runs that step with one OpenMP thread whatever `X_Threads` says. GW is still about 1.7× faster on the GPU because its self-energy part is much faster there, but the BSE Haydock step, where the screening is most of the work, is about 2.4× slower. We use Yambo as released and have not looked into this further.
+- **Screening is slow on the GPU.** Computing the screening (`Xo (procedure)` in the `r-*` reports) takes about 25 s on 2 MIG slices against about 5 s on a full compute-p2 node, in both GW and BSE. Yambo's GPU build runs that step with one OpenMP thread whatever `X_Threads` says. GW is still about 1.7× faster on the GPU because its self-energy part is much faster there, but the BSE Haydock step, where the screening is most of the work, is about 2.4× slower. A full 80 GB A100 does not help: with one MPI task it spends about 60 s in the screening, the same total work as the two MIG slices (which split it between two tasks), so this step is limited by the single host thread, not by the GPU. As a result, one task on a full A100 is no faster than the CPU node for GW and about 4.5× slower for BSE Haydock. Running more MPI tasks splits the screening between them (`08` tests 4 tasks on 4 A100s). We use Yambo as released and have not looked into this further.
 - **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6 (tested). A different QE version might write output `p2y` cannot read; in that case see step 3.
