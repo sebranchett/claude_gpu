@@ -59,11 +59,7 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    ```bash
    sbatch 03_qe_prep.slurm
    ```
-   This runs `pw.x` (CPU) for scf + nscf with 200 bands, converts the result with `p2y`, and runs the Yambo setup. QE is the project's module, loaded with `module use --append /projects/electronic_structure/.modulefiles` and `module load qe` (the job prints the QE version it used). If `p2y` cannot read that QE's output, fall back to the tutorial's ready-made SAVE (100 bands):
-   ```bash
-   sbatch --export=ALL,USE_TUTORIAL_SAVE=1 03_qe_prep.slurm
-   ```
-   Then add `--export=ALL,NB=100` to the test submissions below.
+   This runs `pw.x` (CPU) for scf + nscf with 200 bands, converts the result with `p2y`, and runs the Yambo setup. QE is the project's module, loaded with `module use --append /projects/electronic_structure/.modulefiles` and `module load qe` (the job prints the QE version it used).
 4. **Tests.** Only one job at a time is allowed on `gpu-a100-small`, so start it after the GPU build has finished:
    ```bash
    sbatch 04_test_gpu_small.slurm
@@ -89,14 +85,13 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
 
 ## Options
 
-Set these as environment variables when submitting, for example `sbatch --export=ALL,FRESH=1 01_build_gpu.slurm`. Several go in one list: `--export=ALL,NB=100,LABEL=trial`. Always keep `ALL`, or the job loses your environment.
+Set these as environment variables when submitting, for example `sbatch --export=ALL,FRESH=1 01_build_gpu.slurm`. Several go in one list: `--export=ALL,NB=150,LABEL=trial`. Always keep `ALL`, or the job loses your environment.
 
 | Variable | Jobs | Default | What it does |
 |---|---|---|---|
 | `FRESH=1` | `01`, `02` | off | Deletes the build tree (`build/gpu/` or `build/cpu/`) and builds from scratch. Use it when an earlier attempt left broken state behind, for example after a toolchain change. A fresh build takes several hours, so the GPU build will need resubmitting; leave `FRESH` out of those resubmits, or each one starts over. |
 | `CUDA_RUNTIME=X.Y` | `01` | newest nvhpc CUDA the driver supports | CUDA version passed to `--with-cuda-runtime`. Only takes effect before configure has run, so combine it with `FRESH=1` on an existing tree. |
 | `NBND=N` | `03` | 200 | Number of bands in the QE nscf run. |
-| `USE_TUTORIAL_SAVE=1` | `03` | off | Skips QE + `p2y` and uses the tutorial's ready-made SAVE (100 bands). Then run the tests with `NB=100`. |
 | `NB=N` | `04`, `05`, `07`, `08` | 200 | Bands used in the GW and BSE runs. Must not exceed the bands in the SAVE. |
 | `LABEL=name` | `04`, `05`, `07`, `08` | `gpu_small`, `cpu_p2`, `gpu_a100_1gpu`, `gpu_a100_4gpu` | Name of the run directory under `/scratch/$USER/yambo_5.3.0_tests`, so a trial run does not overwrite an earlier one. |
 
@@ -147,4 +142,4 @@ The full scan result goes to `dependencies.json`. The script then prints every e
 - **CUDA-aware MPI.** The build job prints `mpi_built_with_cuda_support` from the `ompi_info` it finds in the nvhpc SDK. If it says `false`, or no `ompi_info` is found, the GPU build still works, but MPI buffers are copied through host memory.
 - **MIG slices** (`gpu-a100-small`) cannot exchange data GPU-to-GPU, so the 2-task test exercises the multi-GPU code path but says nothing about multi-GPU performance. `08_bench_gpu_a100_4gpu.slurm` (4 A100s on one `gpu-a100` node) measures that.
 - **Screening is slow on the GPU.** Computing the screening (`Xo (procedure)` in the `r-*` reports) takes about 25 s on 2 MIG slices against about 5 s on a full compute-p2 node, in both GW and BSE. Yambo's GPU build runs that step with one OpenMP thread whatever `X_Threads` says. GW is still about 1.7× faster on the GPU because its self-energy part is much faster there, but the BSE Haydock step, where the screening is most of the work, is about 2.4× slower. A full 80 GB A100 does not help: with one MPI task it spends about 60 s in the screening, the same total work as the two MIG slices (which split it between two tasks), so this step is limited by the single host thread, not by the GPU. As a result, one task on a full A100 is no faster than the CPU node for GW and about 4.5× slower for BSE Haydock. Running more MPI tasks splits the screening between them (`08` tests 4 tasks on 4 A100s). We use Yambo as released and have not looked into this further.
-- **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6 (tested). A different QE version might write output `p2y` cannot read; in that case see step 3.
+- **QE version and p2y.** Yambo 5.3.0's `p2y` reads the output of the project's QE 7.6 (tested). A different QE version might write output `p2y` cannot read; `03` then stops with `p2y`'s error.
