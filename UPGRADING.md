@@ -64,3 +64,17 @@ All runs agree with `cpu_p2` within tolerance (QP within 0.56 meV). Valence QP c
 | bse_s | 12.1 s | 8.0 s | 8.0 s |
 
 Wall times vary about 8 % between identical runs. The 4-GPU run (`08`) was pending when this was written.
+
+## One-off: renaming the 5.3.0 installation
+
+5.3.0 was first installed as `yambo_gpu_2026`, before the `yambo_gpu_<version>_<stack>` naming. To move it, on a login node:
+
+```bash
+cd /projects/electronic_structure && mv yambo_gpu_2026 yambo_gpu_5.3.0_2026 && ln -s yambo_gpu_5.3.0_2026 yambo_gpu_2026
+```
+
+The link keeps the old path working, which the installed binaries and libraries may still refer to. Then install the new modulefiles, from the new `scripts/` directory (the next `01`, `02` or `03` job would also do this):
+
+```bash
+for f in gpu cpu; do cp modulefiles/yambo.lua ../modulefiles/yambo-$f/5.3.0.lua; done
+```
