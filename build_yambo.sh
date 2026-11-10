@@ -9,8 +9,8 @@ flavour=${1:?usage: build_yambo.sh gpu|cpu}
 tree=$(yambo_tree "$flavour")
 nproc=${SLURM_CPUS_PER_TASK:-4}
 
-load_toolchain
-ensure_autotools "$flavour"     # libxc is autoreconf'ed by Yambo (common.sh)
+load_toolchain "$flavour"
+load_autotools "$flavour"
 module list 2>&1
 
 echo "== Toolchain"
@@ -203,9 +203,5 @@ if ldd bin/yambo | grep -i 'not found'; then die "unresolved shared libraries in
 
 mkdir -p "$MODULE_DIR/yambo-$flavour"
 cp "$SCRIPT_DIR/modulefiles/yambo-$flavour/$YAMBO_VERSION.lua" "$MODULE_DIR/yambo-$flavour/"
-# The binaries need the same libatomic at run time (see ensure_libatomic in common.sh).
-if [ -n "$LIBATOMIC_ADDED" ]; then
-    echo "prepend_path(\"LD_LIBRARY_PATH\", \"$LIBATOMIC_ADDED\")" >> "$MODULE_DIR/yambo-$flavour/$YAMBO_VERSION.lua"
-fi
 echo "Installed modulefile $MODULE_DIR/yambo-$flavour/$YAMBO_VERSION.lua"
 echo "BUILD OK"

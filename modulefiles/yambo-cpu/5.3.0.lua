@@ -17,7 +17,7 @@ load("nvhpc/25.7")
 -- nvhpc's mpif90 links HPC-X's Open MPI, but the nvhpc module points OPAL_PREFIX at
 -- comm_libs/mpi and does not put HPC-X's libraries on LD_LIBRARY_PATH; without this
 -- MPI_Init fails ("No components were able to be opened in the pml framework").
--- Same as set_mpi_prefix in the build scripts' common.sh.
+-- The build scripts load this modulefile too (load_toolchain in common.sh).
 local hpcx = "/apps/generic/hpc_sdk/Linux_x86_64/25.7/comm_libs/12.9/hpcx/hpcx-2.22.1"
 setenv("OPAL_PREFIX", pathJoin(hpcx, "ompi"))
 -- prepend_path puts each one first, so this list is in reverse: ompi/lib ends up first.

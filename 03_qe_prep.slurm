@@ -35,8 +35,7 @@ if [ "${USE_TUTORIAL_SAVE:-0}" = 1 ]; then
     rm -rf "$TEST_ROOT/hBN_SAVE/SAVE"
     cp -r "$prep/hBN/YAMBO/SAVE" "$TEST_ROOT/hBN_SAVE/"
     rm -f "$TEST_ROOT"/hBN_SAVE/SAVE/ndb.gops "$TEST_ROOT"/hBN_SAVE/SAVE/ndb.kindx
-    load_toolchain
-    export PATH=$(yambo_tree cpu)/bin:$PATH
+    load_toolchain cpu
     cd "$TEST_ROOT/hBN_SAVE"
     $YRUN yambo > setup.log 2>&1 || { tail -30 setup.log; die "yambo setup failed"; }
     echo "PREP OK (tutorial SAVE: submit the tests with --export=ALL,NB=100): $TEST_ROOT/hBN_SAVE"
@@ -57,8 +56,7 @@ grep -m1 -E "Program PWSCF v" hBN_scf.out || true    # QE version actually used
 grep -E "JOB DONE|highest occupied|Fermi" hBN_scf.out hBN_nscf.out || true
 
 echo "== p2y + setup (CPU Yambo)"
-load_toolchain
-export PATH=$(yambo_tree cpu)/bin:$PATH
+load_toolchain cpu
 which p2y yambo
 cd hBN.save
 if ! $YRUN p2y > p2y.log 2>&1; then
