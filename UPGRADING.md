@@ -4,7 +4,7 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
 
 ## Checklist for a new version
 
-1. **Version number.** Set `YAMBO_VERSION` in `common.sh`. Copy both modulefiles to the new version's name and change the version and the `root` path inside them. Find any other hard-coded version with `git grep -n 5.3.0`.
+1. **Version number.** Set `YAMBO_VERSION` in `common.sh` (and `STACK`, if DelftBlue has a newer software stack). That gives a new project directory, `yambo_gpu_<version>_<stack>`, next to the old one; copy the scripts there. Copy both modulefiles to the new version's name and change the version, the `root` path and `load("<stack>")` inside them. Find any other hard-coded version with `git grep -n 5.3.0`.
 2. **Toolchain.** If DelftBlue has a newer `nvhpc`, update `NVHPC_MODULE` in `common.sh` and the HPC-X path in both modulefiles (`comm_libs/<cuda>/hpcx/hpcx-<version>`, see [MPI](#delftblue-lessons)). Check the Yambo wiki's NVfortran page for changed configure flags.
 3. **Downloads** (`00_fetch_sources.sh`, login node). Check that every library downloaded. In 5.3.0, `yaml-0.2.2` was missing from Yambo's mirror and is fetched from pyyaml.org instead; that workaround may no longer be needed, or another library may need one.
 4. **Builds** (`01`, `02`). A new version gets a new build tree, so it starts fresh. Check:
@@ -13,7 +13,7 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
    - `EXT_CHECKS` in `build_yambo.sh` against the `do_*` switches in the new `config/mk/global/defs.mk`: a library Yambo added or renamed needs a line there, or a silent failure goes unnoticed.
 5. **SAVE** (`03`). Check that the new `p2y` reads the project QE's output.
 6. **Tests** (`04`, `05`, `07`, `08`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `run_tests.sh` and `example/yambo_hBN_gpu.slurm`.
-7. **Compare** (`06`). Against the CPU run of the new version, and against the 5.3.0 results below: the physics should not change between versions.
+7. **Compare** (`06`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
 8. **Known limitation.** Check whether the GPU screening is still single-threaded (see [Yambo behaviour](#yambo-behaviour-worth-knowing)); if the new version fixes it, update README.
 
 ## DelftBlue lessons
@@ -43,7 +43,7 @@ Also: compute and GPU nodes have no internet (downloads on a login node); the lo
 
 | Topic | Decision |
 |---|---|
-| Install location | `/projects/electronic_structure/yambo_gpu_2026`; the build tree is the installation (never delete `build/`). |
+| Install location | `/projects/electronic_structure/yambo_gpu_<version>_<stack>`, one per version (5.3.0: `yambo_gpu_5.3.0_2026`, first installed as `yambo_gpu_2026`, now a link); the build tree is the installation (never delete `build/`). |
 | Account | `research-as-cheme` |
 | Toolchain | `module load 2026; module load compilers gcc; module load nvhpc/25.7` |
 | GPU mode | `--enable-cuda-fortran --with-cuda-cc=80`, CUDA runtime = newest nvhpc CUDA the driver supports (12.9 with driver CUDA 13.4). |

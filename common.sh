@@ -1,13 +1,14 @@
 # Shared settings for the Yambo 5.3.0 DelftBlue build. Sourced, not executed.
 
 YAMBO_VERSION=5.3.0
+STACK=2026                              # DelftBlue software stack: 'module load 2026'
 NVHPC_MODULE=nvhpc/25.7
 GCC_MODULES="compilers gcc"             # gcc 13.4.0 in the 2026 stack; supplies libatomic.so.1
 QE_MODULE_PATH=/projects/electronic_structure/.modulefiles   # project QE modules (module use --append)
 QE_MODULE=qe
 ACCOUNT=research-as-cheme
 
-PROJ=/projects/electronic_structure/yambo_gpu_2026
+PROJ=/projects/electronic_structure/yambo_gpu_${YAMBO_VERSION}_$STACK   # one directory per version and stack
 SRC_DIR=$PROJ/src                       # downloaded tarballs (filled on the login node)
 BUILD_ROOT=$PROJ/build                  # build trees; also the install location, do not delete
 MODULE_DIR=$PROJ/modulefiles
@@ -29,7 +30,7 @@ load_toolchain() {
     # Child bash processes in a job do not always inherit the module function.
     type -t module > /dev/null || source /etc/profile
     module purge
-    module load 2026
+    module load "$STACK"
     # GCC first, so nvhpc's compilers and MPI come first in the search paths.
     # It provides libatomic.so.1, which nvhpc's HPC-X MPI needs (see ensure_libatomic).
     module load $GCC_MODULES

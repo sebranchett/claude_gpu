@@ -26,6 +26,6 @@ for _, d in ipairs({"nccl_rdma_sharp_plugin/lib", "sharp/lib", "hcoll/lib", "ucc
     prepend_path("LD_LIBRARY_PATH", pathJoin(hpcx, d))
 end
 
-local root = "/projects/electronic_structure/yambo_gpu_2026/build/cpu/yambo-5.3.0"
+local root = "/projects/electronic_structure/yambo_gpu_5.3.0_2026/build/cpu/yambo-5.3.0"
 prepend_path("PATH", pathJoin(root, "bin"))
 setenv("YAMBO_ROOT", root)

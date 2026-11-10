@@ -48,7 +48,7 @@ NB=200              # bands used in GW and BSE; at most the number of bands in y
 # Software. The module loads nvhpc and sets up its MPI.
 type module > /dev/null 2>&1 || source /etc/profile
 module purge
-module use /projects/electronic_structure/yambo_gpu_2026/modulefiles
+module use /projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles
 module load yambo-gpu/5.3.0
 
 # OpenMP threads per MPI task, each thread on its own core.

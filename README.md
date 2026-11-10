@@ -13,20 +13,31 @@ Building a newer Yambo version? Start with [UPGRADING.md](UPGRADING.md): a check
 | Built on | `gpu-a100-small` | `compute-p2` |
 | Runs on | `gpu-a100`, `gpu-a100-small` | `compute-p2`, GPU nodes (not `compute-p1`: built for Sapphire Rapids) |
 
-Everything lives in `/projects/electronic_structure/yambo_gpu_2026`:
+Each Yambo version gets its own directory, `/projects/electronic_structure/yambo_gpu_<version>_<stack>`, where `<stack>` is the DelftBlue software stack (`2026`). Both are set in `common.sh` (`YAMBO_VERSION`, `STACK`). A new version is built next to the old one, which stays usable. For 5.3.0:
 
 ```
-src/                 Yambo + library tarballs, hBN tutorial (from 00_fetch_sources.sh)
-build/gpu/yambo-5.3.0/   GPU build tree = installation (bin/), do not delete
-build/cpu/yambo-5.3.0/   CPU build tree = installation
-modulefiles/         yambo-gpu/5.3.0.lua, yambo-cpu/5.3.0.lua
+/projects/electronic_structure/yambo_gpu_5.3.0_2026/
+  scripts/                 this repository
+  src/                     Yambo + library tarballs, hBN tutorial (from 00_fetch_sources.sh)
+  build/gpu/yambo-5.3.0/   GPU build tree = installation (bin/), do not delete
+  build/cpu/yambo-5.3.0/   CPU build tree = installation
+  modulefiles/             yambo-gpu/5.3.0.lua, yambo-cpu/5.3.0.lua
+  reference/cpu_p2_5.3.0/  validated test results, to compare the next version with (step 6)
 ```
+
+5.3.0 was first installed as `yambo_gpu_2026`. To move it to the new name, run on a login node:
+
+```bash
+cd /projects/electronic_structure && mv yambo_gpu_2026 yambo_gpu_5.3.0_2026 && ln -s yambo_gpu_5.3.0_2026 yambo_gpu_2026
+```
+
+The link keeps the old path working, which the installed binaries and libraries may still refer to. Then copy the updated `modulefiles/*/5.3.0.lua` to the new `modulefiles/`.
 
 Test runs go to `/scratch/$USER/yambo_5.3.0_tests`.
 
 ## Run order
 
-Copy this directory to DelftBlue, for example to `/projects/electronic_structure/yambo_gpu_2026/scripts`, and submit everything **from that directory**: the jobs find `common.sh` through `$SLURM_SUBMIT_DIR`.
+Copy this directory to DelftBlue, for example to `/projects/electronic_structure/yambo_gpu_5.3.0_2026/scripts`, and submit everything **from that directory**: the jobs find `common.sh` through `$SLURM_SUBMIT_DIR`.
 
 1. **On a login node** (the compute and GPU nodes have no internet):
    ```bash
@@ -60,6 +71,15 @@ Copy this directory to DelftBlue, for example to `/projects/electronic_structure
    python3 -I 06_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p2,gpu_small,gpu_a100_1gpu,gpu_a100_4gpu}
    ```
    It checks that every output file agrees between the runs (QP corrections within 5 meV, spectra within 1 %, Haydock spectra within 2 %: Haydock stops at 2 % accuracy, `BSHayTrs`), and prints the wall time of each step with speed-ups relative to the CPU node.
+6. **Keep the reference** (login node), once validation has passed. The output files, reports and timings of the CPU run are all `06_compare.py` needs; the SAVE is left out:
+   ```bash
+   ref=/projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0
+   mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p2/{o-*,r-*,timings.tsv} $ref/
+   ```
+   When the next version is validated, compare it with this one too. The physics should not change between versions:
+   ```bash
+   python3 -I 06_compare.py /projects/electronic_structure/yambo_gpu_5.3.0_2026/reference/cpu_p2_5.3.0 /scratch/$USER/yambo_<new version>_tests/cpu_p2
+   ```
 
 ## Options
 
@@ -92,7 +112,7 @@ To make the benchmark heavier, raise `NB` (and `NBND` in `03_qe_prep.slurm`) or 
 ## Using the installation
 
 ```bash
-module use /projects/electronic_structure/yambo_gpu_2026/modulefiles
+module use /projects/electronic_structure/yambo_gpu_5.3.0_2026/modulefiles
 module load yambo-gpu/5.3.0
 ```
 
