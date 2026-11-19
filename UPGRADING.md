@@ -1,64 +1,89 @@
 # Upgrading to a new Yambo version
 
-What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next version starts from the answers rather than the debugging.
+What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next version starts from the answers instead of the debugging.
 
 ## Checklist for a new version
 
-1. **Version number.** Set `YAMBO_VERSION` in `common.sh` (and `STACK`, if DelftBlue has a newer software stack). That gives a new project directory, `yambo_<version>_<stack>`, next to the old one; copy the scripts there. The modulefile (`modulefiles/yambo.lua`) needs no change for a new Yambo version: it takes the version from the name it is installed under. Find any other hard-coded version with `git grep -n 5.3.0`.
-2. **Toolchain.** If DelftBlue has a newer software stack or `nvhpc`, update the three settings at the top of `modulefiles/yambo.lua`: `stack` (same as `STACK` in `common.sh`), `nvhpc`, and the HPC-X path (`comm_libs/<cuda>/hpcx/hpcx-<version>`; look it up in the new nvhpc, see [MPI](#delftblue-lessons)). The builds load the toolchain from this modulefile too. Check the Yambo wiki's NVfortran page for changed configure flags.
-3. **Downloads** (`00_fetch_sources.sh`, login node). Check that every library downloaded. In 5.3.0, `yaml-0.2.2` was missing from Yambo's mirror and is fetched from pyyaml.org instead; that workaround may no longer be needed, or another library may need one.
-4. **Builds** (`01`, `02`). A new version gets a new build tree, so it starts fresh. Check:
-   - `config/report`: CUDA Fortran, MPI, OpenMP, parallel HDF5 I/O, SLEPc and ScaLAPACK on.
-   - `mpi_built_with_cuda_support:true` in the GPU build output.
-   - `-tp cascadelake` in the CPU build output (it must run on compute-p1; see [DelftBlue lessons](#delftblue-lessons)).
-   - `EXT_CHECKS` in `build_yambo.sh` against the `do_*` switches in the new `config/mk/global/defs.mk`: a library Yambo added or renamed needs a line there, or a silent failure goes unnoticed.
-5. **SAVE** (`03`). Check that the new `p2y` reads the project QE's output.
-6. **Tests** (`04`–`07`). "X not found in Y.in" means Yambo renamed an input variable: generate an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `example/yambo_hBN_gpu.slurm` (the tests run that script). Also update the module and SAVE defaults at its top.
-7. **Compare** (`08`). Against the CPU run of the new version, and against the previous version's kept reference, `/projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p1_5.3.0` (README step 6): the physics should not change between versions. Then keep the new version's reference the same way.
-8. **Known limitation.** Check whether the GPU screening is still single-threaded (see [Yambo behaviour](#yambo-behaviour-worth-knowing)); if the new version fixes it, update README.
+1. **Version.** Set `YAMBO_VERSION` in `common.sh` (and `STACK` for a newer DelftBlue software stack). This gives a new project directory, `yambo_<version>_<stack>`, next to the old one. The modulefile needs no change: it reads the version from its installed name. Find other hard-coded versions with `git grep -n 5.3.0`.
+2. **Toolchain.** For a newer stack or `nvhpc`, update the three settings at the top of `modulefiles/yambo.lua`: `stack` (= `STACK`), `nvhpc`, and the HPC-X path (`comm_libs/<cuda>/hpcx/hpcx-<version>` in the new nvhpc; see [MPI](#mpi-and-slurm)). The builds load the toolchain from this modulefile too. Check the Yambo wiki's NVfortran page for changed configure flags.
+3. **Downloads** (`00`, login node). Check every library downloaded. In 5.3.0, `yaml-0.2.2` was missing from Yambo's mirror and comes from pyyaml.org; that may no longer be needed, or another library may need the same.
+4. **Builds** (`01`, `02`), fresh for a new version. Check:
+   - `config/report`: CUDA Fortran, MPI, OpenMP, parallel HDF5 I/O, SLEPc and ScaLAPACK on;
+   - GPU output: `mpi_built_with_cuda_support:true`, and the `Toolchain:` line with `OPAL_PREFIX` ending in `hpcx-*/ompi`;
+   - CPU output: `-tp cascadelake` (see [Building](#building));
+   - `EXT_CHECKS` in `build_yambo.sh` against the `do_*` switches in the new `config/mk/global/defs.mk`: a library Yambo added or renamed needs a line, or its failure goes unnoticed.
+5. **SAVE** (`03`). Check the new `p2y` reads the project QE's output.
+6. **Tests** (`04`–`07`). "X not found in Y.in" means Yambo renamed an input variable: write an input by hand (`yambo -F test.in <options>`) to find the new name, and fix it in `example/yambo_hBN_gpu.slurm`. Also update the module and SAVE defaults at its top.
+7. **Compare** (`08`) with the new CPU run, and with the previous version's reference, `/projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p1_5.3.0`: the physics should not change. Then keep the new reference (README step 6).
+8. **Known limitations.** Check whether the GPU screening and BSE kernel are still slow (see [Yambo behaviour](#yambo-behaviour-worth-knowing)); update README if not.
 
 ## DelftBlue lessons
 
-| Symptom | Cause | Fix (where) |
-|---|---|---|
-| Every MPI Fortran program fails to start: `libatomic.so.1` not found. First seen as IOTK's configure failing at "checking whether the Fortran compiler works". | HPC-X's `libmpi_usempif08.so` needs `libatomic.so.1`; the nodes do not have it. | Load `compilers gcc` from the 2026 stack before `nvhpc` (modulefiles). |
-| `MPI_Init` fails; Open MPI looks for its help files under `comm_libs/mpi`. Then: "No components were able to be opened in the pml framework". | `nvhpc`'s `mpif90` links HPC-X's Open MPI, but the module points `OPAL_PREFIX` elsewhere and does not put HPC-X's libraries on `LD_LIBRARY_PATH`. | Set `OPAL_PREFIX` to `hpcx-*/ompi` and prepend `ompi/lib` (first) plus HPC-X's `ucx`, `ucc`, `hcoll`, `sharp` lib dirs (modulefiles). |
-| `yambo` or `p2y` started directly inside a job fails in PMIx ("OMPI was not built with SLURM's PMI support"). | HPC-X treats any process in a Slurm job as an srun launch. | Always `srun --mpi=pmix`, also for one process (`srun --nodes=1 --ntasks=1 --mpi=pmix`), including when generating input files. |
-| OpenMP threads all pinned to one CPU. | Since Slurm 22.05, `srun` does not inherit `--cpus-per-task`. | `export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK`, plus `OMP_PLACES=cores OMP_PROC_BIND=close`. |
-| A library seems built but later "Unable to open MODULE file netcdf.mod". | Yambo's `ext-libs` loop ignores failures and stamps each step as done anyway, so a failed library is never retried. Its `log/` file is overwritten by the next step. | `build_yambo.sh` builds `ext-libs` separately, checks each library's files (`EXT_CHECKS`), and resets failed ones (delete `lib/<lib>/*.stamp` and the unpacked tree). The real error is in the library's own `config.log`. |
-| libxc: `possibly undefined macro: AC_DISABLE_SHARED`, then `cannot find install-sh`. | Yambo runs `autoreconf` on libxc; the nodes have no libtool. | `module load gpu autoconf automake libtool` (`cpu ...` on CPU nodes) (`load_autotools` in `common.sh`). |
-| A job that loads the Yambo module fails in `MPI_Init`, with the `comm_libs/mpi` help-file error above, although the build and test jobs worked. | The installed modulefile was an old hand copy without the `OPAL_PREFIX` lines. The 5.3.0 build and test jobs set up MPI themselves, so they did not notice. | The `01`, `02` and `03` jobs now install `modulefiles/yambo.lua` and load it. Check with `module show yambo-gpu/<version> 2>&1 \| grep OPAL`. |
-| Driver CUDA version not parsed. | New `nvidia-smi` prints `CUDA UMD Version: X.Y`. | Handled in `build_yambo.sh`. |
-| `sbatch` rejects `--gres` or `--gpus`. | DelftBlue GPU partitions only accept `--gpus-per-task`. | Use `--gpus-per-task=1`. |
-| GPU build stops at 4 h. | `gpu-a100-small`: at most 2 CPUs per task, 4 h, one job per user. | `make -j 2`; resubmit, the build resumes (13 min for ext-libs plus about 1 h for core once it works). |
-| A CPU build made on compute-p2 may crash on compute-p1 (illegal instruction). | nvfortran, and the libraries' own configure scripts, target the build node's CPU: Sapphire Rapids on compute-p2 and the GPU nodes, Cascade Lake (Xeon Gold 6248R, AVX-512 without FP16/BF16/AMX) on compute-p1. | Build the CPU version on compute-p1 (`02`): its default target, `-tp cascadelake`, also runs on Sapphire Rapids. Then test on both partitions (`05`, `06`). A program that only starts (`yambo -h`) proves nothing: it ran on compute-p1 even from the Sapphire Rapids build. |
+Also: compute and GPU nodes have no internet (download on a login node); the login node has a different software stack (compile only in jobs); `OMPI_MCA_btl=^openib` and `OMPI_MCA_plm_slurm_args=--external-launcher` are set system-wide and survive `module purge`.
 
-Also: compute and GPU nodes have no internet (downloads on a login node); the login node has a different software stack (compile only in jobs); `OMPI_MCA_btl=^openib` and `OMPI_MCA_plm_slurm_args=--external-launcher` are set system-wide and survive `module purge`.
+### MPI and Slurm
+
+- **Every MPI Fortran program fails to start: `libatomic.so.1` not found.** First seen as IOTK's configure failing at "checking whether the Fortran compiler works".
+  *Cause:* HPC-X's `libmpi_usempif08.so` needs it; the nodes do not have it.
+  *Fix:* load `compilers gcc` from the 2026 stack before `nvhpc` (modulefile).
+- **`MPI_Init` fails; Open MPI looks for its help files under `comm_libs/mpi`.** Then: "No components were able to be opened in the pml framework".
+  *Cause:* nvhpc's `mpif90` links HPC-X's Open MPI, but the nvhpc module points `OPAL_PREFIX` elsewhere and leaves HPC-X's libraries off `LD_LIBRARY_PATH`.
+  *Fix:* set `OPAL_PREFIX` to `hpcx-*/ompi`; prepend `ompi/lib` (first) and HPC-X's `ucx`, `ucc`, `hcoll`, `sharp` lib dirs (modulefile).
+- **The same `MPI_Init` error in a job using the module, while the build and test jobs worked.**
+  *Cause:* the installed modulefile was an old hand copy without the `OPAL_PREFIX` lines; the 5.3.0 build and test jobs set up MPI themselves, so they did not notice.
+  *Fix:* jobs `01`, `02` and `03` now install `modulefiles/yambo.lua` and load it. Check with `module show yambo-gpu/<version> 2>&1 | grep OPAL`.
+- **`yambo` or `p2y` started directly inside a job fails in PMIx** ("OMPI was not built with SLURM's PMI support").
+  *Cause:* HPC-X treats any process in a Slurm job as an srun launch.
+  *Fix:* always `srun --mpi=pmix`, also for one process (`srun --nodes=1 --ntasks=1 --mpi=pmix`), including to write input files.
+- **All OpenMP threads pinned to one CPU.**
+  *Cause:* since Slurm 22.05, `srun` does not inherit `--cpus-per-task`.
+  *Fix:* `export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK OMP_PLACES=cores OMP_PROC_BIND=close`.
+- **`sbatch` rejects `--gres` or `--gpus`.** DelftBlue GPU partitions only accept `--gpus-per-task=1`.
+- **`CUDA_VISIBLE_DEVICES` is `0` in every task.** Normal: each task sees only its own GPU. To check they differ, compare UUIDs (the example prints one per task).
+
+### Building
+
+- **A library looks built, but later "Unable to open MODULE file netcdf.mod".**
+  *Cause:* Yambo's `ext-libs` loop ignores failures and marks each step done anyway, so a failed library is never retried; its `log/` file is overwritten by the next step.
+  *Fix:* `build_yambo.sh` builds `ext-libs` separately, checks each library's files (`EXT_CHECKS`) and resets failed ones (deletes `lib/<lib>/*.stamp` and the unpacked tree). The real error is in the library's own `config.log`.
+- **libxc: `possibly undefined macro: AC_DISABLE_SHARED`, then `cannot find install-sh`.**
+  *Cause:* Yambo runs `autoreconf` on libxc, and the nodes have no libtool.
+  *Fix:* `module load gpu autoconf automake libtool` (`cpu ...` on CPU nodes); `load_autotools` in `common.sh`.
+- **A CPU build made on compute-p2 may crash on compute-p1** (illegal instruction).
+  *Cause:* nvfortran and the libraries' configure scripts target the build node's CPU: Sapphire Rapids on compute-p2 and the GPU nodes, Cascade Lake (Xeon Gold 6248R) on compute-p1.
+  *Fix:* build the CPU version on compute-p1 (`02`); its `-tp cascadelake` also runs on Sapphire Rapids. Test on both partitions (`05`, `06`): `yambo -h` starting proves nothing, it even started on compute-p1 from the Sapphire Rapids build.
+- **GPU build stops at 4 h.** `gpu-a100-small` allows 2 CPUs per task, 4 h, one job per user. Hence `make -j 2`; resubmit and the build resumes (about 13 min for ext-libs, 1 h for the core).
+- **Driver CUDA version not parsed.** New `nvidia-smi` prints `CUDA UMD Version: X.Y`; handled in `build_yambo.sh`.
 
 ## Yambo behaviour worth knowing
 
-- **GPU screening runs on one host thread.** The independent-particle response `Xo` (`Xo (procedure)` in the reports), in both GW and the BSE static screening, is computed by host code with one OpenMP thread: the GPU build forces `n_threads_X=1` (`src/pol_function/X_irredux.F`, around line 191) whatever `X_Threads` says. The GPU size makes no difference, only the number of MPI tasks splitting it does: in GW, `Xo` took 60.8 s with 1 task on one A100 and 13.5 s with 4 tasks on 4 A100s.
-- **The GPU BSE kernel is slow too.** The BSE kernel (`X T_space Kernel` in the reports, mostly its `Kernel sum`, `src/bse/K_kernel.F`) is a separate step from `Xo`, though its name looks similar. It is also slower than on a CPU node (bse_h on 2 MIG slices: 22.5 s, against 6.4 s on a compute-p2 node), and it also splits over MPI tasks (`Kernel sum` 35.1 s with 1 task, 10.0 s with 4). So use one MPI task per GPU on all the GPUs; one task on one big GPU is the worst layout. We decided not to modify or investigate Yambo's source.
-- **Haydock accuracy.** The Haydock solver stops at about 2 % accuracy (`BSHayTrs=-0.02`), and eps from runs with different parallel layouts differs by about that much; `08_compare.py` judges `haydock` files at 2 % for that reason. The EEL spectrum can differ more, because Yambo extends eps beyond the computed energy window for it ("Possible inaccuracy in the EPS prolungation" in the report). The 4-GPU run's EEL was 5 % off the CPU run's, although it had converged further (0.69 % in 64 iterations, against 1.44 % in 59). So an occasional EEL DIFF is expected: check `Accuracy (reached)` in both `r-bse_h_*` reports.
-- **Build defaults.** Yambo's nvfortran flags are `-O1 -gopt`, in single precision; we kept them. In 5.3.0, OpenACC force-disables OpenMP, which is why we use CUDA Fortran.
+Two steps are slow in the GPU build. They split over MPI tasks, so use one task per GPU on all the GPUs: one task on one big GPU is the worst layout. We decided not to modify or investigate Yambo's source.
+
+| Step (name in the `r-*` reports) | Why | 1 task, 1 A100 | 4 tasks, 4 A100s |
+|---|---|---|---|
+| Screening, `Xo (procedure)` (GW and BSE) | Host code on one OpenMP thread: the GPU build sets `n_threads_X=1` (`src/pol_function/X_irredux.F`, around line 191) whatever `X_Threads` says, so GPU size does not matter | 60.8 s (gw) | 13.5 s |
+| BSE kernel, `X T_space Kernel`, mostly its `Kernel sum` (`src/bse/K_kernel.F`) | Not known; a separate step from `Xo` despite the similar name. On 2 MIG slices 22.5 s, against 6.4 s on a compute-p2 node | 35.1 s (sum) | 10.0 s |
+
+- **Haydock accuracy.** The solver stops at about 2 % (`BSHayTrs=-0.02`), so eps from different parallel layouts differs by about that much; `08_compare.py` judges `haydock` files at 2 %. EEL can differ more: Yambo extends eps beyond the computed energy window for it ("Possible inaccuracy in the EPS prolungation"). The 4-GPU run's EEL was 5 % off the CPU run's, although it had converged further (0.69 % in 64 iterations, against 1.44 % in 59). So an occasional EEL DIFF is expected: compare `Accuracy (reached)` in the two `r-bse_h_*` reports.
+- **Build defaults.** nvfortran flags `-O1 -gopt`, single precision; kept. In 5.3.0 OpenACC switches OpenMP off, hence CUDA Fortran.
 
 ## Decisions
 
 | Topic | Decision |
 |---|---|
-| Install location | `/projects/electronic_structure/yambo_<version>_<stack>`, one per version (5.3.0: `yambo_5.3.0_2026`, first installed as `yambo_gpu_2026`, now a link); the build tree is the installation (never delete `build/`). |
+| Install location | `/projects/electronic_structure/yambo_<version>_<stack>`, one per version. 5.3.0 was first installed as `yambo_gpu_2026`, now a link to `yambo_5.3.0_2026`. The build tree is the installation. |
 | Account | `research-as-cheme` |
 | Toolchain | `module load 2026; module load compilers gcc; module load nvhpc/25.7` |
-| GPU mode | `--enable-cuda-fortran --with-cuda-cc=80`, CUDA runtime = newest nvhpc CUDA the driver supports (12.9 with driver CUDA 13.4). |
-| Libraries | All built internally by Yambo (HDF5, netCDF, LibXC, FFTW, ScaLAPACK, PETSc, SLEPc); BLAS/LAPACK from nvhpc. |
+| GPU mode | `--enable-cuda-fortran --with-cuda-cc=80`; CUDA runtime = newest nvhpc CUDA the driver supports (12.9 with driver CUDA 13.4). |
+| Libraries | All built by Yambo (HDF5, netCDF, LibXC, FFTW, ScaLAPACK, PETSc, SLEPc); BLAS/LAPACK from nvhpc. |
 | DFT | Project QE module (`module use --append /projects/electronic_structure/.modulefiles; module load qe`, QE 7.6), CPU only. |
 | Test system | Bulk hBN from the Yambo tutorial, 200 bands. |
-| CPU build | Same nvhpc, built on compute-p1 so it runs on compute-p1 and compute-p2 (users submit with `--partition=compute-p1,compute-p2`). Tested on each partition with 24 MPI × 2 OpenMP, the usual layout that fits both node types (48 and 64 cores). Replaced the first CPU build, which was made on compute-p2. |
-| Yambo source | Used as released, not modified. |
+| CPU build | Built on compute-p1, runs on compute-p1 and compute-p2. Tested on each with 24 MPI × 2 OpenMP, which fits both node types (48 and 64 cores). Replaced a first CPU build made on compute-p2. |
+| Yambo source | Used as released. |
 
 ## Yambo 5.3.0 reference results
 
-From the first CPU build (made on compute-p2, run on one full compute-p2 node). All runs agree with `cpu_p2` within tolerance (QP within 0.56 meV), except the 4-GPU run's Haydock EEL spectrum (5 %; see [Haydock accuracy](#yambo-behaviour-worth-knowing)). Valence QP corrections are −0.66 to −0.86 eV, conduction +0.71 to +1.43 eV. The portable CPU build's results (`cpu_p1`, `cpu_p2` at 24 × 2) were pending when this was written.
+Reference: the first CPU build (made on compute-p2, run on a full compute-p2 node). Every run agrees within tolerance (QP within 0.56 meV), except the 4-GPU run's Haydock EEL (5 %; see [Haydock accuracy](#yambo-behaviour-worth-knowing)). Valence QP corrections −0.66 to −0.86 eV, conduction +0.71 to +1.43 eV. Results of the portable CPU build (`cpu_p1`, `cpu_p2` at 24 × 2) were pending when this was written.
 
 | Step | cpu_p2, first build (32 × 2) | gpu_small (2 MIG × 2) | gpu_a100_1gpu (1 × 16) | gpu_a100_4gpu (4 × 16) |
 |---|---|---|---|---|
@@ -66,34 +91,4 @@ From the first CPU build (made on compute-p2, run on one full compute-p2 node). 
 | bse_h | 29.3 s | 70.0 s | 131.6 s | 40.7 s |
 | bse_s | 12.1 s | 8.0 s | 8.0 s | 7.8 s |
 
-Wall times vary about 8 % between identical runs. `gpu_a100_1gpu` came from a benchmark job that has since been dropped: its finding (with a single MPI task, one host thread does all of the screening) is under [Yambo behaviour](#yambo-behaviour-worth-knowing). `gpu_a100_4gpu` is the layout of `07_bench_gpu_a100.slurm`, run with the scripts before this clean-up.
-
-## One-off: renaming the 5.3.0 installation
-
-5.3.0 was first installed as `yambo_gpu_2026`, before the `yambo_<version>_<stack>` naming. To move it, on a login node:
-
-```bash
-cd /projects/electronic_structure && mv yambo_gpu_2026 yambo_5.3.0_2026 && ln -s yambo_5.3.0_2026 yambo_gpu_2026
-```
-
-The link keeps the old path working, which the installed binaries and libraries may still refer to. Then install the new modulefiles, from the new `scripts/` directory (the next `01`, `02` or `03` job would also do this):
-
-```bash
-for f in gpu cpu; do cp modulefiles/yambo.lua ../modulefiles/yambo-$f/5.3.0.lua; done
-```
-
-## One-off: replacing the 5.3.0 CPU build with the portable one
-
-The first CPU build was made on compute-p2 and may not run on compute-p1. To replace it, after the renaming above:
-
-1. Keep its test results first, as the reference for the new build (the new `06` overwrites `cpu_p2`):
-   ```bash
-   ref=/projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p2_5.3.0_first_build
-   mkdir -p $ref && cp /scratch/$USER/yambo_5.3.0_tests/cpu_p2/{o-*,r-*,timings.tsv} $ref/
-   ```
-2. Rebuild on compute-p1 from scratch, `sbatch --export=ALL,FRESH=1 02_build_cpu.slurm`; `yambo-cpu/5.3.0` is unusable until it ends with `BUILD OK`. Check that the job output says `-tp cascadelake`. The SAVE from `03` is plain data and can stay.
-3. `sbatch 05_test_cpu_p1.slurm` and `sbatch 06_test_cpu_p2.slurm`, then compare with the first build and the GPU runs:
-   ```bash
-   python3 -I 08_compare.py /scratch/$USER/yambo_5.3.0_tests/{cpu_p1,cpu_p2,gpu_small,gpu_a100_4gpu} /projects/electronic_structure/yambo_5.3.0_2026/reference/cpu_p2_5.3.0_first_build
-   ```
-4. Keep `cpu_p1` as the 5.3.0 reference (README step 6).
+Wall times vary about 8 % between identical runs. `gpu_a100_1gpu` came from a benchmark job since dropped. `gpu_a100_4gpu` has the layout of `07`, run with the scripts before this clean-up.
