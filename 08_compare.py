@@ -32,11 +32,16 @@ def read_table(path):
 
 
 def column_labels(path):
-    """Column titles from Yambo's header line, e.g. '# E/ev[1] EEL/Im[2] ...' -> {1: 'E/ev', 2: 'EEL/Im'}."""
+    """Column titles from Yambo's header line. Two styles:
+    '# E/ev[1] EEL/Im[2] ...'                  -> {1: 'E/ev', 2: 'EEL/Im'}
+    '#    E[1] [eV]     Im(eel)     Re(eel)'   -> {1: 'E [eV]', 2: 'Im(eel)', 3: 'Re(eel)'} (5.3.0)"""
     labels = {}
     for line in path.read_text().splitlines():
         if line.lstrip().startswith("#") and "[1]" in line:
             labels = {int(n): name for name, n in re.findall(r"(\S+?)\s*\[(\d+)\]", line)}
+            if len(labels) < 2:   # only the first column numbered: titles are separated by 2+ spaces
+                titles = re.split(r"\s{2,}", line.strip().lstrip("#").strip())
+                labels = {i + 1: t.replace("[1]", " ").replace("  ", " ").strip() for i, t in enumerate(titles)}
     return labels
 
 
