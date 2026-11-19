@@ -66,9 +66,11 @@ YAMBO="srun --mpi=pmix yambo"                          # all tasks
 YAMBO1="srun --nodes=1 --ntasks=1 --mpi=pmix yambo"    # one task, to write input files
 
 echo "Yambo: $(which yambo)"
+echo "MPI: OPAL_PREFIX=${OPAL_PREFIX:-unset}"    # should end in hpcx-*/ompi
 echo "Layout: $SLURM_NTASKS MPI tasks x $OMP_NUM_THREADS OpenMP threads on $(hostname)"
-# Each task should have its own CPUs (and, on GPU nodes, its own GPU).
-srun --mpi=pmix bash -c 'echo "task $SLURM_PROCID: CPUs $(taskset -cp $$ | sed "s/.*: //") GPU ${CUDA_VISIBLE_DEVICES:-none}"' | sort -V | awk 'NR <= 8'
+# Each task should have its own CPUs (and, on GPU nodes, its own GPU or MIG slice: a
+# different UUID; CUDA_VISIBLE_DEVICES is 0 in every task, so it does not tell).
+srun --mpi=pmix bash -c 'gpu=$(nvidia-smi -L 2> /dev/null | grep -o "UUID: [^)]*" | tail -1); gpu=${gpu#UUID: }; echo "task $SLURM_PROCID: CPUs $(taskset -cp $$ | sed "s/.*: //") GPU ${gpu:-none}"' | sort -V | awk 'NR <= 8'
 if command -v nvidia-smi > /dev/null; then nvidia-smi -L; fi
 
 mkdir -p "$RUN"

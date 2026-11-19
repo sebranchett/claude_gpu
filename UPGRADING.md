@@ -27,6 +27,7 @@ What we learned building Yambo 5.3.0 on DelftBlue (November 2026), so the next v
 | OpenMP threads all pinned to one CPU. | Since Slurm 22.05, `srun` does not inherit `--cpus-per-task`. | `export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK`, plus `OMP_PLACES=cores OMP_PROC_BIND=close`. |
 | A library seems built but later "Unable to open MODULE file netcdf.mod". | Yambo's `ext-libs` loop ignores failures and stamps each step as done anyway, so a failed library is never retried. Its `log/` file is overwritten by the next step. | `build_yambo.sh` builds `ext-libs` separately, checks each library's files (`EXT_CHECKS`), and resets failed ones (delete `lib/<lib>/*.stamp` and the unpacked tree). The real error is in the library's own `config.log`. |
 | libxc: `possibly undefined macro: AC_DISABLE_SHARED`, then `cannot find install-sh`. | Yambo runs `autoreconf` on libxc; the nodes have no libtool. | `module load gpu autoconf automake libtool` (`cpu ...` on CPU nodes) (`load_autotools` in `common.sh`). |
+| A job that loads the Yambo module fails in `MPI_Init`, with the `comm_libs/mpi` help-file error above, although the build and test jobs worked. | The installed modulefile was an old hand copy without the `OPAL_PREFIX` lines. The 5.3.0 build and test jobs set up MPI themselves, so they did not notice. | The `01`, `02` and `03` jobs now install `modulefiles/yambo.lua` and load it. Check with `module show yambo-gpu/<version> 2>&1 \| grep OPAL`. |
 | Driver CUDA version not parsed. | New `nvidia-smi` prints `CUDA UMD Version: X.Y`. | Handled in `build_yambo.sh`. |
 | `sbatch` rejects `--gres` or `--gpus`. | DelftBlue GPU partitions only accept `--gpus-per-task`. | Use `--gpus-per-task=1`. |
 | GPU build stops at 4 h. | `gpu-a100-small`: at most 2 CPUs per task, 4 h, one job per user. | `make -j 2`; resubmit, the build resumes (13 min for ext-libs plus about 1 h for core once it works). |
@@ -36,8 +37,9 @@ Also: compute and GPU nodes have no internet (downloads on a login node); the lo
 
 ## Yambo behaviour worth knowing
 
-- **GPU screening runs on one host thread.** The independent-particle response `Xo`, in both GW and the BSE static screening, is computed by host code with one OpenMP thread: the GPU build forces `n_threads_X=1` (`src/pol_function/X_irredux.F`, around line 191) whatever `X_Threads` says. Its inner `X T_space Kernel sum` took 35 s of work in total on 2 MIG slices (2 tasks × 17.5 s) and on a full A100 (1 task × 35.1 s): the GPU size makes no difference, only the number of MPI tasks splitting it does. So use several MPI tasks; one task on one big GPU is the worst layout. We decided not to modify or investigate Yambo's source.
-- **Haydock accuracy.** The Haydock solver stops at about 2 % accuracy (`BSHayTrs=-0.02`), and runs with different parallel layouts differ by up to that much, most in the EEL spectrum. `08_compare.py` judges `haydock` files at 2 % for that reason.
+- **GPU screening runs on one host thread.** The independent-particle response `Xo` (`Xo (procedure)` in the reports), in both GW and the BSE static screening, is computed by host code with one OpenMP thread: the GPU build forces `n_threads_X=1` (`src/pol_function/X_irredux.F`, around line 191) whatever `X_Threads` says. The GPU size makes no difference, only the number of MPI tasks splitting it does: in GW, `Xo` took 60.8 s with 1 task on one A100 and 13.5 s with 4 tasks on 4 A100s.
+- **The GPU BSE kernel is slow too.** The BSE kernel (`X T_space Kernel` in the reports, mostly its `Kernel sum`, `src/bse/K_kernel.F`) is a separate step from `Xo`, though its name looks similar. It is also slower than on a CPU node (bse_h on 2 MIG slices: 22.5 s, against 6.4 s on a compute-p2 node), and it also splits over MPI tasks (`Kernel sum` 35.1 s with 1 task, 10.0 s with 4). So use one MPI task per GPU on all the GPUs; one task on one big GPU is the worst layout. We decided not to modify or investigate Yambo's source.
+- **Haydock accuracy.** The Haydock solver stops at about 2 % accuracy (`BSHayTrs=-0.02`), and eps from runs with different parallel layouts differs by about that much; `08_compare.py` judges `haydock` files at 2 % for that reason. The EEL spectrum can differ more, because Yambo extends eps beyond the computed energy window for it ("Possible inaccuracy in the EPS prolungation" in the report). The 4-GPU run's EEL was 5 % off the CPU run's, although it had converged further (0.69 % in 64 iterations, against 1.44 % in 59). So an occasional EEL DIFF is expected: check `Accuracy (reached)` in both `r-bse_h_*` reports.
 - **Build defaults.** Yambo's nvfortran flags are `-O1 -gopt`, in single precision; we kept them. In 5.3.0, OpenACC force-disables OpenMP, which is why we use CUDA Fortran.
 
 ## Decisions
@@ -56,15 +58,15 @@ Also: compute and GPU nodes have no internet (downloads on a login node); the lo
 
 ## Yambo 5.3.0 reference results
 
-From the first CPU build (made on compute-p2, run on one full compute-p2 node). All runs agree with `cpu_p2` within tolerance (QP within 0.56 meV). Valence QP corrections are −0.66 to −0.86 eV, conduction +0.71 to +1.43 eV. The portable CPU build's results (`cpu_p1`, `cpu_p2` at 24 × 2) were pending when this was written.
+From the first CPU build (made on compute-p2, run on one full compute-p2 node). All runs agree with `cpu_p2` within tolerance (QP within 0.56 meV), except the 4-GPU run's Haydock EEL spectrum (5 %; see [Haydock accuracy](#yambo-behaviour-worth-knowing)). Valence QP corrections are −0.66 to −0.86 eV, conduction +0.71 to +1.43 eV. The portable CPU build's results (`cpu_p1`, `cpu_p2` at 24 × 2) were pending when this was written.
 
-| Step | cpu_p2, first build (32 × 2) | gpu_small (2 MIG × 2) | gpu_a100_1gpu (1 × 16) |
-|---|---|---|---|
-| gw | 149.8 s | 88.3 s | 148.9 s |
-| bse_h | 29.3 s | 70.0 s | 131.6 s |
-| bse_s | 12.1 s | 8.0 s | 8.0 s |
+| Step | cpu_p2, first build (32 × 2) | gpu_small (2 MIG × 2) | gpu_a100_1gpu (1 × 16) | gpu_a100_4gpu (4 × 16) |
+|---|---|---|---|---|
+| gw | 149.8 s | 88.3 s | 148.9 s | 46.0 s |
+| bse_h | 29.3 s | 70.0 s | 131.6 s | 40.7 s |
+| bse_s | 12.1 s | 8.0 s | 8.0 s | 7.8 s |
 
-Wall times vary about 8 % between identical runs. `gpu_a100_1gpu` came from a benchmark job that has since been dropped: its finding (with a single MPI task, one host thread does all of the screening) is under [Yambo behaviour](#yambo-behaviour-worth-knowing). The 4-GPU run (`07_bench_gpu_a100.slurm`, label `gpu_a100_4gpu`) was pending when this was written.
+Wall times vary about 8 % between identical runs. `gpu_a100_1gpu` came from a benchmark job that has since been dropped: its finding (with a single MPI task, one host thread does all of the screening) is under [Yambo behaviour](#yambo-behaviour-worth-knowing). `gpu_a100_4gpu` is the layout of `07_bench_gpu_a100.slurm`, run with the scripts before this clean-up.
 
 ## One-off: renaming the 5.3.0 installation
 
