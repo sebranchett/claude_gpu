@@ -53,11 +53,11 @@ echo "Run directory: $RUN (databases from $SRC_RUN)"
 
 set_var() {
     grep -qE "^ *$2 *=" "$1" || die "$2 not found in $1"
-    sed -i -E "s|^ *$2 *=.*|$2= $3|" "$1"
+    sed -i -E "s|^ *$2 *=[^#]*|$2= $3 |" "$1"
 }
 set_block() {
     grep -qE "^ *% *$2([ #].*)?$" "$1" || die "block $2 not found in $1"
-    sed -i -E "/^ *% *$2([ #].*)?$/{n;s/.*/ $3/}" "$1"
+    sed -i -E "/^ *% *$2([ #].*)?$/{n;s/^[^#]*/ $3 /}" "$1"
 }
 
 # Same BSE parameters as the test's bse_h and bse_s steps (example/yambo_hBN_gpu.slurm);

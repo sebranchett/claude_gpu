@@ -86,16 +86,17 @@ if [ ! -f SAVE/ndb.gops ]; then
 fi
 
 # Yambo writes a default input file with all variables (-F name, -Q: do not open an
-# editor); these two functions then change the values we need.
+# editor); these two functions then change the values we need. They replace only the
+# value, up to the '# ...' comment Yambo puts after it, so the comment is kept.
 # set_var FILE VAR VALUE : change the line 'VAR= ...'
 set_var() {
     grep -qE "^ *$2 *=" "$1" || { echo "ERROR: $2 not found in $1"; exit 1; }
-    sed -i -E "s|^ *$2 *=.*|$2= $3|" "$1"
+    sed -i -E "s|^ *$2 *=[^#]*|$2= $3 |" "$1"
 }
 # set_block FILE VAR VALUES : change the line after '% VAR'
 set_block() {
     grep -qE "^ *% *$2([ #].*)?$" "$1" || { echo "ERROR: block $2 not found in $1"; exit 1; }
-    sed -i -E "/^ *% *$2([ #].*)?$/{n;s/.*/ $3/}" "$1"
+    sed -i -E "/^ *% *$2([ #].*)?$/{n;s/^[^#]*/ $3 /}" "$1"
 }
 
 # run_step NAME INPUT : run yambo on all tasks, check it finished, record the wall time.
@@ -120,7 +121,7 @@ set_block gw.in BndsRnXp "1 | $NB |"     # bands in the screening
 set_var   gw.in NGsBlkXp "8 Ry"          # size of the screening matrix
 set_block gw.in GbndRnge "1 | $NB |"     # bands in the self-energy
 # QP corrections for bands 7-10 (top two valence, bottom two conduction) at all k-points
-sed -i -E "/^ *% *QPkrange([ #].*)?$/{n;s/^( *[0-9]+ *\| *[0-9]+ *\|).*/\1 7 | 10 |/}" gw.in
+sed -i -E "/^ *% *QPkrange([ #].*)?$/{n;s/^( *[0-9]+ *\| *[0-9]+ *\|)[^#]*/\1 7 | 10 | /}" gw.in
 run_step gw gw.in
 
 # --- 2. BSE, Haydock solver ---------------------------------------------------
