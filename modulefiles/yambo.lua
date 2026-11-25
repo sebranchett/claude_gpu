@@ -22,7 +22,8 @@ if flavour == "gpu" then
 else
     about = "Yambo " .. version .. ", CPU build (OpenMP, MPI, SLEPc).\n" ..
             "Built with nvhpc/" .. nvhpc .. " for Cascade Lake: runs on compute-p1, compute-p2 and the GPU nodes,\n" ..
-            "e.g. with #SBATCH --partition=compute-p1,compute-p2\n"
+            "Use a full node: 24 tasks x 2 threads on compute-p1, 32 x 2 on compute-p2\n" ..
+            "(24 x 2 on compute-p2 gave wrong BSE Haydock spectra).\n"
 end
 help(about .. "Inside a Slurm job always start yambo/p2y/ypp with srun --mpi=pmix, even for one\n" ..
      "process: started directly, MPI_Init fails.")

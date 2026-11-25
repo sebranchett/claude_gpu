@@ -65,6 +65,7 @@ Two steps are slow in the GPU build. They split over MPI tasks, so use one task 
 | BSE kernel, `X T_space Kernel`, mostly its `Kernel sum` (`src/bse/K_kernel.F`) | Not known; a separate step from `Xo` despite the similar name. On 2 MIG slices 22.5 s, against 6.4 s on a compute-p2 node | 35.1 s (sum) | 10.0 s |
 
 - **Haydock accuracy.** The solver stops at about 2 % (`BSHayTrs=-0.02`), so eps from different parallel layouts differs by about that much; `08_compare.py` judges `haydock` files at 2 %. EEL can differ more: Yambo extends eps beyond the computed energy window for it ("Possible inaccuracy in the EPS prolungation"). The 4-GPU run's EEL was 5 % off the CPU run's, although it had converged further (0.69 % in 64 iterations, against 1.44 % in 59). So an occasional EEL DIFF is expected: compare `Accuracy (reached)` in the two `r-bse_h_*` reports.
+- **Haydock can converge to a wrong spectrum, depending on the layout.** On compute-p2 with 24 tasks × 2 threads (a part-filled node), two runs on different nodes took 110 and 113 Haydock iterations instead of the usual 59. Each still reported reaching the 2 % threshold, but its spectrum was wrong at 6.0–6.3 eV: 15–25 % off the exact (diagonalized) spectrum, against 0.6–0.8 % for the runs that took 59 iterations. The two runs also differed from each other. Every other layout tried gave 59 iterations (64 on 4 A100s) and the right spectrum: 24 × 2 on compute-p1, 32 × 2 on compute-p2 (both CPU builds), and all the GPU layouts. Cause not investigated. Haydock's stopping test compares one iteration with the next, so "accuracy reached" does not prove the spectrum is right. To check a run, compare its `Iterations` line in `r-bse_h_*` with a known-good run: about twice as many means distrust it. `08_compare.py` flags it as a Haydock DIFF while GW and SLEPc agree; `09_bse_diag_check.slurm` scores Haydock runs against the exact spectrum.
 - **Build defaults.** nvfortran flags `-O1 -gopt`, single precision; kept. In 5.3.0 OpenACC switches OpenMP off, hence CUDA Fortran.
 
 ## Decisions
@@ -78,12 +79,12 @@ Two steps are slow in the GPU build. They split over MPI tasks, so use one task 
 | Libraries | All built by Yambo (HDF5, netCDF, LibXC, FFTW, ScaLAPACK, PETSc, SLEPc); BLAS/LAPACK from nvhpc. |
 | DFT | Project QE module (`module use --append /projects/electronic_structure/.modulefiles; module load qe`, QE 7.6), CPU only. |
 | Test system | Bulk hBN from the Yambo tutorial, 200 bands. |
-| CPU build | Built on compute-p1, runs on compute-p1 and compute-p2. Tested on each with 24 MPI × 2 OpenMP, which fits both node types (48 and 64 cores). Replaced a first CPU build made on compute-p2. |
+| CPU build | Built on compute-p1, runs on compute-p1 and compute-p2. Tested on a full node of each: 24 MPI × 2 OpenMP on compute-p1, 32 × 2 on compute-p2 (24 × 2 there broke Haydock, see [Haydock](#yambo-behaviour-worth-knowing)). Replaced a first CPU build made on compute-p2. |
 | Yambo source | Used as released. |
 
 ## Yambo 5.3.0 reference results
 
-Reference: the first CPU build (made on compute-p2, run on a full compute-p2 node). Every run agrees within tolerance (QP within 0.56 meV), except the 4-GPU run's Haydock EEL (5 %; see [Haydock accuracy](#yambo-behaviour-worth-knowing)). Valence QP corrections −0.66 to −0.86 eV, conduction +0.71 to +1.43 eV. Results of the portable CPU build (`cpu_p1`, `cpu_p2` at 24 × 2) were pending when this was written.
+Reference: the first CPU build (made on compute-p2, run on a full compute-p2 node). Every run agrees within tolerance (QP within 0.56 meV), except the 4-GPU run's Haydock EEL (5 %; see [Haydock accuracy](#yambo-behaviour-worth-knowing)). Valence QP corrections −0.66 to −0.86 eV, conduction +0.71 to +1.43 eV. Results of the portable CPU build (`cpu_p1`; `cpu_p2` at 32 × 2) were pending when this was written.
 
 | Step | cpu_p2, first build (32 × 2) | gpu_small (2 MIG × 2) | gpu_a100_1gpu (1 × 16) | gpu_a100_4gpu (4 × 16) |
 |---|---|---|---|---|

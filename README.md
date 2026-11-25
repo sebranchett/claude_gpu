@@ -57,7 +57,7 @@ Submit every job **from the scripts directory**: the jobs find `common.sh` throu
    |---|---|---|---|
    | `sbatch 04_test_gpu_small.slurm` | `gpu-a100-small` | 2 tasks × 2 threads, one MIG slice each | `gpu_small` |
    | `sbatch 05_test_cpu_p1.slurm` | `compute-p1` | 24 tasks × 2 threads | `cpu_p1` |
-   | `sbatch 06_test_cpu_p2.slurm` | `compute-p2` | 24 tasks × 2 threads | `cpu_p2` |
+   | `sbatch 06_test_cpu_p2.slurm` | `compute-p2` | 32 tasks × 2 threads | `cpu_p2` |
    | `sbatch 07_bench_gpu_a100.slurm` (optional) | `gpu-a100` | 4 tasks × 16 threads, one A100 each | `gpu_a100_4gpu` |
 
 5. **Compare**, on a login node. The first run listed is the reference; leave out runs you did not do.
@@ -104,7 +104,7 @@ module load yambo-gpu/5.3.0     # or yambo-cpu/5.3.0
 
 - **Always start `yambo`, `p2y` and `ypp` with `srun --mpi=pmix`** inside a job, even for one process: started directly, HPC-X's Open MPI fails in `MPI_Init`.
 - **GPU jobs:** one MPI task per GPU (`--gpus-per-task=1`), several OpenMP threads per task. On `gpu-a100`: up to 4 tasks per node, up to 16 cores each. Use all 4 GPUs (see the limitations below).
-- **CPU jobs:** `--partition=compute-p1,compute-p2` lets Slurm choose, with a layout that fits a 48-core compute-p1 node, e.g. 24 tasks × 2 threads and `--mem-per-cpu=3900M`.
+- **CPU jobs:** pick one partition and fill a node: on `compute-p1` 24 tasks × 2 threads (`--mem-per-cpu=3900M`), on `compute-p2` 32 tasks × 2 threads (`--mem-per-cpu=3000M`). Do not use the compute-p1 layout on compute-p2: with 24 × 2 there, the BSE Haydock solver gave a wrong spectrum (see [Haydock accuracy](UPGRADING.md#yambo-behaviour-worth-knowing)).
 
 **Example job.** `example/yambo_hBN_gpu.slurm` runs the hBN test on one full `gpu-a100` node, without these scripts (a comment shows how to use `gpu-a100-small` instead). It loads the module, copies the SAVE to `/scratch/$USER/yambo_hBN_example/<job id>`, runs Yambo's setup if needed, then GW, BSE Haydock and BSE SLEPc. To use it:
 1. Make an hBN SAVE: QE scf + nscf with the tutorial's inputs, converted with `p2y` (see [01_scf.sh in MoS2-QE-Yambo-pnas](https://github.com/sebranchett/MoS2-QE-Yambo-pnas/blob/main/01_scf.sh) or the [Simulation Suite](https://simulationsuite.streamlit.app/)). The default `SAVE_SRC` is the SAVE from step 3.
